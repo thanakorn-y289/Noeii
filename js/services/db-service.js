@@ -282,6 +282,108 @@ class DbService {
     return updated;
   }
 
+  // ===================== STAR REWARDS =====================
+
+  async awardStar(count = 1) {
+    const user = authService.getCurrentUser();
+    const userId = user?.uid || 'guest';
+    const stats = await this.getUserStats();
+    stats.starsCount = (stats.starsCount || 0) + count;
+    localStorage.setItem(`stats_${userId}`, JSON.stringify(stats));
+
+    if (user && !user.isGuest && isFirebaseConfigured()) {
+      try {
+        const fs = await this.getFirestore();
+        if (fs) {
+          const { doc, setDoc } = fs.mods;
+          await setDoc(doc(fs.db, 'users', userId, 'meta', 'stats'), { starsCount: stats.starsCount }, { merge: true });
+        }
+      } catch (e) {
+        console.warn('Firestore awardStar error:', e);
+      }
+    }
+    return stats.starsCount;
+  }
+
+  // ===================== CUSTOM SCENARIOS (FOR TEACHERS / ADMINS) =====================
+
+  async saveCustomScenario(data) {
+    const user = authService.getCurrentUser();
+    const id = data.id || `custom_${Date.now()}`;
+    const scenario = {
+      ...data,
+      id,
+      isCustom: true,
+      createdBy: user?.displayName || 'Teacher/Parent',
+      createdAt: new Date().toISOString()
+    };
+
+    // บันทึกลง Local Cache
+    const local = this.getLocalList('custom_scenarios_all');
+    const filtered = local.filter(s => s.id !== id);
+    filtered.unshift(scenario);
+    localStorage.setItem('custom_scenarios_all', JSON.stringify(filtered));
+
+    // บันทึกขึ้น Cloud Firestore ในคอลเลกชันส่วนกลาง 'custom_scenarios'
+    if (isFirebaseConfigured()) {
+      try {
+        const fs = await this.getFirestore();
+        if (fs) {
+          const { doc, setDoc } = fs.mods;
+          const scenarioDoc = doc(fs.db, 'custom_scenarios', id);
+          await setDoc(scenarioDoc, scenario);
+        }
+      } catch (err) {
+        console.error('Firestore save custom scenario error:', err);
+      }
+    }
+
+    return scenario;
+  }
+
+  async getCustomScenarios() {
+    if (isFirebaseConfigured()) {
+      try {
+        const fs = await this.getFirestore();
+        if (fs) {
+          const { collection, getDocs, query, orderBy } = fs.mods;
+          const col = collection(fs.db, 'custom_scenarios');
+          const snapshot = await getDocs(col);
+          const list = [];
+          snapshot.forEach(doc => list.push(doc.data()));
+          if (list.length > 0) {
+            localStorage.setItem('custom_scenarios_all', JSON.stringify(list));
+            return list;
+          }
+        }
+      } catch (err) {
+        console.warn('Firestore fetch custom scenarios error:', err);
+      }
+    }
+
+    return this.getLocalList('custom_scenarios_all');
+  }
+
+  async deleteCustomScenario(scenarioId) {
+    // ลบจาก Local Cache
+    const local = this.getLocalList('custom_scenarios_all');
+    const filtered = local.filter(s => s.id !== scenarioId);
+    localStorage.setItem('custom_scenarios_all', JSON.stringify(filtered));
+
+    // ลบจาก Cloud Firestore
+    if (isFirebaseConfigured()) {
+      try {
+        const fs = await this.getFirestore();
+        if (fs) {
+          const { doc, deleteDoc } = fs.mods;
+          await deleteDoc(doc(fs.db, 'custom_scenarios', scenarioId));
+        }
+      } catch (err) {
+        console.error('Firestore delete custom scenario error:', err);
+      }
+    }
+  }
+
   // ===================== LOCAL STORAGE HELPERS =====================
 
   getLocalList(key) {

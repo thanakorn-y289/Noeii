@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="เว็บแอพฝึกสนทนาภาษาอังกฤษแบบอินเทอร์แอคทีฟ มีระบบรับเสียงพูด ตอบกลับด้วยเสียง พร้อมเก็บข้อมูลบน Firebase และ Google Login">
-  <title>EngSpeak AI - เว็บแอพฝึกสนทนาภาษาอังกฤษ</title>
+  <meta name="description" content="เว็บแอพฝึกพูดภาษาอังกฤษแสนสนุกสำหรับเด็กประถม มีระบบแปลงเสียงพูด ตอบกลับด้วยเสียง สะสมดาว และระบบสร้างบทสนทนาสำหรับคุณครู">
+  <title>EngSpeak Kids 🎈 - เว็บแอพฝึกสนทนาภาษาอังกฤษสำหรับเด็กประถม</title>
 
   <!-- Google Fonts: Inter & Noto Sans Thai -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Thai:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
   <!-- CSS Stylesheets -->
   <link rel="stylesheet" href="./css/main.css">
@@ -21,28 +21,34 @@
   <!-- Top App Header -->
   <header class="app-header">
     <div class="brand" id="brand-btn">
-      <div class="brand-icon">🗣️</div>
+      <div class="brand-icon">🎈</div>
       <div class="brand-title">
-        <span class="brand-name">EngSpeak AI</span>
-        <span class="brand-tag">ฝึกสนทนาภาษาอังกฤษเสมือนจริง</span>
+        <span class="brand-name">EngSpeak Kids</span>
+        <span class="brand-tag">ฝึกพูดภาษาอังกฤษแสนสนุก ⭐</span>
       </div>
     </div>
 
     <!-- Navigation Tabs -->
     <nav class="nav-tabs">
       <button class="nav-tab active" data-view="scenarios">
-        <span>🎙️</span> <span>สถานการณ์</span>
+        <span>🎮</span> <span>ด่านบทสนทนา</span>
       </button>
       <button class="nav-tab" data-view="wordbank">
-        <span>📖</span> <span>คลังคำศัพท์</span>
+        <span>📖</span> <span>สมุดคำศัพท์</span>
       </button>
       <button class="nav-tab" data-view="history">
-        <span>📊</span> <span>สถิติ & ประวัติ</span>
+        <span>🏆</span> <span>ดาว & สถิติ</span>
       </button>
     </nav>
 
     <!-- Header Actions -->
     <div class="header-actions">
+      <!-- Star Reward Pill -->
+      <div class="star-counter-badge" id="header-stars-badge" title="ดาวสะสมความเก่งของคุณ">
+        <span class="star-icon-spin">⭐</span>
+        <span id="header-stars-count">0</span> ดวง
+      </div>
+
       <!-- Firebase Badge -->
       <div class="firebase-indicator warning" id="firebase-indicator" title="คลิกเพื่อตั้งค่า Firebase">
         <span class="indicator-dot"></span>
@@ -61,7 +67,7 @@
 
       <!-- User Profile Badge -->
       <div class="user-badge" id="user-profile-badge" title="บัญชีผู้ใช้ & Google Login">
-        <img src="https://api.dicebear.com/7.x/bottts/svg?seed=guest" alt="User Avatar" class="user-avatar" id="header-user-avatar">
+        <img src="https://api.dicebear.com/7.x/bottts/svg?seed=kid" alt="User Avatar" class="user-avatar" id="header-user-avatar">
         <span class="user-name" id="header-user-name">Guest Learner</span>
       </div>
     </div>
@@ -70,40 +76,54 @@
   <!-- Main Container -->
   <main class="main-content">
 
-    <!-- VIEW 1: SCENARIOS (สถานการณ์ฝึกพูด) -->
+    <!-- VIEW 1: SCENARIOS (ด่านฝึกพูดสำหรับเด็กประถม) -->
     <section class="view-section active" id="view-scenarios">
       <!-- Hero Banner -->
       <div class="hero-banner">
         <div class="hero-text">
-          <h1>ฝึกพูดภาษาอังกฤษอย่างมั่นใจ 🚀</h1>
-          <p>เลือกสถานการณ์จำลองที่คุณต้องการฝึกฝน แล้วเริ่มคุยโต้ตอบกับ AI Partner ผ่านเสียงพูดแบบ Real-time พร้อมรับคำแนะนำแกรมม่าและคำแปลภาษาไทย</p>
+          <h1>เก่งภาษาอังกฤษไปด้วยกัน! 🌟</h1>
+          <p>เลือกด่านที่ชอบ แล้วกดไมค์คุยกับเพื่อนสัตว์และหุ่นยนต์น่ารักๆ ได้เลย! พูดจบรับดาวสะสมความเก่งทันที ⭐</p>
         </div>
         <div class="hero-stats">
           <div class="stat-chip">
+            <div class="stat-value" id="stat-stars-banner">0 ⭐</div>
+            <div class="stat-label">ดาวสะสม</div>
+          </div>
+          <div class="stat-chip">
             <div class="stat-value" id="stat-streak">1 🔥</div>
-            <div class="stat-label">Daily Streak</div>
+            <div class="stat-label">ฝึกต่อเนื่อง</div>
           </div>
           <div class="stat-chip">
             <div class="stat-value" id="stat-practices">0</div>
-            <div class="stat-label">รอบที่ฝึก</div>
-          </div>
-          <div class="stat-chip">
-            <div class="stat-value" id="stat-minutes">0 นาที</div>
-            <div class="stat-label">เวลาที่ใช้</div>
+            <div class="stat-label">ด่านที่เล่นแล้ว</div>
           </div>
         </div>
+      </div>
+
+      <!-- Teacher / Admin Bar -->
+      <div class="teacher-action-bar">
+        <div class="teacher-bar-info">
+          <span>🎨</span>
+          <div class="teacher-bar-text">
+            <h4>สำหรับคุณครู & ผู้ปกครอง (Teacher / Parent Mode)</h4>
+            <p>สร้างบทสนทนาใหม่ หรือเพิ่มหัวข้อตามหลักสูตรบทเรียน บันทึกขึ้น Cloud ให้เด็กๆ เข้าฝึกได้ทันที</p>
+          </div>
+        </div>
+        <button class="btn btn-rainbow btn-sm" id="btn-open-custom-scenario">
+          ➕ สร้างบทสนทนาใหม่
+        </button>
       </div>
 
       <!-- Filters & Search -->
       <div class="filter-bar">
         <div class="filter-tags">
-          <button class="filter-btn active" data-level="all">ทุกระดับ</button>
-          <button class="filter-btn" data-level="beginner">Beginner (เริ่มต้น)</button>
-          <button class="filter-btn" data-level="intermediate">Intermediate (ปานกลาง)</button>
-          <button class="filter-btn" data-level="advanced">Advanced (ขั้นสูง)</button>
+          <button class="filter-btn active" data-level="all">ทุกด่าน 🌈</button>
+          <button class="filter-btn" data-level="p1-p3">ประถม 1 - 3 🐣</button>
+          <button class="filter-btn" data-level="p4-p6">ประถม 4 - 6 🚀</button>
+          <button class="filter-btn" data-level="custom">ด่านที่คุณครูสร้าง 🎨</button>
         </div>
         <div style="min-width: 240px;">
-          <input type="text" id="search-scenarios-input" class="form-control" placeholder="🔍 ค้นหาสถานการณ์หรือหัวข้อ..." style="border-radius: var(--radius-full);">
+          <input type="text" id="search-scenarios-input" class="form-control" placeholder="🔍 ค้นหาด่านที่ชอบ..." style="border-radius: var(--radius-full);">
         </div>
       </div>
 
@@ -113,27 +133,27 @@
       </div>
     </section>
 
-    <!-- VIEW 2: CHAT PRACTICE ROOM (ห้องสนทนาสด) -->
+    <!-- VIEW 2: CHAT PRACTICE ROOM (ห้องสนทนาสดสำหรับเด็ก) -->
     <section class="view-section" id="view-chat">
       <div class="chat-room-container">
         <!-- Header -->
         <div class="chat-room-header">
           <div class="partner-info">
             <div class="partner-avatar-box">
-              <span id="chat-partner-avatar">🧑‍🍳</span>
+              <span id="chat-partner-avatar">🐻</span>
               <span class="speaking-indicator-dot" id="chat-speaking-dot"></span>
             </div>
             <div class="partner-meta">
               <h3>
-                <span id="chat-partner-name">Alex</span>
-                <span class="partner-role-badge" id="chat-partner-role">Barista</span>
+                <span id="chat-partner-name">Mimi</span>
+                <span class="partner-role-badge" id="chat-partner-role">Ice Cream Maker</span>
               </h3>
-              <div class="partner-scenario-title" id="chat-scenario-title">☕ Ordering Coffee & Snacks</div>
+              <div class="partner-scenario-title" id="chat-scenario-title">🍦 Ice Cream & Sweet Shop</div>
             </div>
           </div>
           <div class="chat-room-actions">
             <button class="btn btn-secondary btn-sm" id="btn-finish-practice">
-              ⏹️ จบการสนทนา
+              ⏹️ บันทึกดาว & ออก
             </button>
           </div>
         </div>
@@ -151,9 +171,9 @@
         <!-- Chat Input Bar -->
         <div class="chat-input-bar">
           <div class="speech-control-area">
-            <!-- Central Microphone Button -->
+            <!-- Big Central Microphone Button -->
             <div class="mic-button-wrapper">
-              <button class="btn-mic" id="btn-mic-toggle" title="กดเพื่อเริ่ม/หยุดพูด">
+              <button class="btn-mic" id="btn-mic-toggle" title="กดเพื่อเริ่มพูด">
                 🎙️
               </button>
               <div class="mic-wave-ring"></div>
@@ -161,7 +181,7 @@
 
             <!-- Text Input Fallback -->
             <div class="input-text-wrapper">
-              <input type="text" id="chat-input-text" class="chat-text-input" placeholder="กดไมค์เพื่อพูดภาษาอังกฤษ หรือพิมพ์ข้อความที่นี่...">
+              <input type="text" id="chat-input-text" class="chat-text-input" placeholder="กดไมค์เพื่อพูดภาษาอังกฤษ หรือพิมพ์ตรงนี้จ้า...">
               <button class="btn-send" id="btn-chat-send" title="ส่งข้อความ">
                 ➤
               </button>
@@ -169,23 +189,23 @@
           </div>
 
           <div class="status-indicator-text" id="speech-status-indicator">
-            แตะไมค์เพื่อพูด
+            แตะไมค์เพื่อพูด 🎙️
           </div>
         </div>
       </div>
     </section>
 
-    <!-- VIEW 3: WORD BANK (คลังคำศัพท์) -->
+    <!-- VIEW 3: WORD BANK (สมุดคำศัพท์สำหรับเด็ก) -->
     <section class="view-section" id="view-wordbank">
       <div class="word-bank-header">
         <div>
-          <h2>📖 คลังคำศัพท์ส่วนตัว (Word Bank)</h2>
-          <p style="color: var(--text-muted); font-size: 0.9rem;">คำศัพท์และสำนวนที่คุณบันทึกไว้ระหว่างการฝึก พร้อมความหมายและการออกเสียง</p>
+          <h2>📖 สมุดคำศัพท์คนเก่ง (My Word Bank)</h2>
+          <p style="color: var(--text-muted); font-size: 0.95rem; font-weight: 600;">คำศัพท์ภาษาอังกฤษที่หนูๆ บันทึกไว้ แตะฟังเสียงอ่านได้ตลอดเวลาจ้า</p>
         </div>
         <div style="display: flex; align-items: center; gap: 0.75rem;">
-          <span class="badge-level beginner" id="wordbank-count">0 คำ</span>
+          <span class="badge-level p1-p3" id="wordbank-count">0 คำ</span>
           <button class="btn btn-primary btn-sm" id="btn-open-add-vocab">
-            ➕ เพิ่มคำศัพท์ใหม่
+            ➕ จดคำศัพท์ใหม่
           </button>
         </div>
       </div>
@@ -195,11 +215,11 @@
       </div>
     </section>
 
-    <!-- VIEW 4: HISTORY & STATS (ประวัติและสถิติ) -->
+    <!-- VIEW 4: HISTORY & STATS (ดาวและประวัติ) -->
     <section class="view-section" id="view-history">
       <div style="margin-bottom: 1.5rem;">
-        <h2>📊 ประวัติการฝึกฝนและสถิติ</h2>
-        <p style="color: var(--text-muted); font-size: 0.9rem;">ติดตามความสม่ำเสมอและทบทวนบทสนทนาที่คุณเคยฝึกฝน</p>
+        <h2>🏆 เหรียญรางวัลและประวัติการฝึก</h2>
+        <p style="color: var(--text-muted); font-size: 0.95rem; font-weight: 600;">ดูความก้าวหน้าและด่านต่างๆ ที่เคยฝึกพูดมาแล้ว</p>
       </div>
 
       <div class="history-list" id="history-list-container">
@@ -211,12 +231,102 @@
 
   <!-- App Footer -->
   <footer class="app-footer">
-    <p>EngSpeak AI — ฝึกพูดภาษาอังกฤษเชื่อมต่อ Firebase & Google Login | ฝากโฮสต์บน <a href="https://github.com" target="_blank" rel="noopener">GitHub</a></p>
+    <p>EngSpeak Kids 🎈 — ฝึกพูดภาษาอังกฤษสำหรับเด็กประถม | เชื่อมต่อ Firebase & Google Login | โฮสต์บน <a href="https://github.com" target="_blank" rel="noopener">GitHub</a></p>
   </footer>
 
   <!-- ==================== MODALS ==================== -->
 
-  <!-- 1. Firebase Setup Modal -->
+  <!-- 1. Custom Scenario Builder Modal (สำหรับครู/ผู้ปกครอง) -->
+  <div class="modal-overlay" id="custom-scenario-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>🎨 สร้างบทสนทนาใหม่ (Custom Scenario)</h3>
+        <button class="modal-close" id="btn-close-custom-scenario-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="form-help">
+          สร้างด่านสนทนาใหม่ตามหัวข้อที่ต้องการ ข้อมูลจะถูกบันทึกขึ้น <strong>Cloud Firestore</strong> ให้เด็กๆ ทุกคนเข้าฝึกได้ทันที
+        </p>
+
+        <div class="form-group">
+          <label>1. ชื่อด่านภาษาอังกฤษ (Title) *</label>
+          <input type="text" id="custom-title" class="form-control" placeholder="เช่น Visiting the Toy Store">
+        </div>
+
+        <div class="form-group">
+          <label>2. ชื่อด่านภาษาไทย (Thai Title) *</label>
+          <input type="text" id="custom-title-th" class="form-control" placeholder="เช่น เที่ยวร้านของเล่นแสนสนุก 🧸">
+        </div>
+
+        <div class="form-group">
+          <label>3. ระดับชั้น (Grade Level)</label>
+          <select id="custom-level" class="form-control">
+            <option value="ประถม 1 - 3">ประถม 1 - 3 (เริ่มต้น)</option>
+            <option value="ประถม 4 - 6">ประถม 4 - 6 (ปานกลาง)</option>
+            <option value="ทุกระดับชั้น">ทุกระดับชั้น</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>4. เลือกตัวการ์ตูนมาสคอต (Mascot Emoji)</label>
+          <div class="emoji-picker-container" id="custom-emoji-picker">
+            <div class="emoji-pill selected" data-emoji="🐻">🐻</div>
+            <div class="emoji-pill" data-emoji="🐶">🐶</div>
+            <div class="emoji-pill" data-emoji="🐱">🐱</div>
+            <div class="emoji-pill" data-emoji="🐰">🐰</div>
+            <div class="emoji-pill" data-emoji="🐼">🐼</div>
+            <div class="emoji-pill" data-emoji="🦁">🦁</div>
+            <div class="emoji-pill" data-emoji="🦄">🦄</div>
+            <div class="emoji-pill" data-emoji="🤖">🤖</div>
+            <div class="emoji-pill" data-emoji="🍦">🍦</div>
+            <div class="emoji-pill" data-emoji="🍕">🍕</div>
+            <div class="emoji-pill" data-emoji="🚀">🚀</div>
+            <div class="emoji-pill" data-emoji="🎨">🎨</div>
+            <div class="emoji-pill" data-emoji="⚽">⚽</div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label>5. ชื่อตัวละคร *</label>
+            <input type="text" id="custom-partner-name" class="form-control" placeholder="เช่น Teddy">
+          </div>
+          <div class="form-group">
+            <label>6. บทบาทตัวละคร *</label>
+            <input type="text" id="custom-partner-role" class="form-control" placeholder="เช่น Toy Maker">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>7. คำอธิบายด่านสั้นๆ</label>
+          <input type="text" id="custom-description" class="form-control" placeholder="เช่น ซื้อของเล่นและตุ๊กตาตัวโปรด">
+        </div>
+
+        <div class="form-group">
+          <label>8. ประโยคทักทายแรกของตัวละคร (English) *</label>
+          <input type="text" id="custom-initial-msg" class="form-control" placeholder="เช่น Hello! Welcome to the toy store! What toy do you want?">
+        </div>
+
+        <div class="form-group">
+          <label>9. คำแปลภาษาไทยของประโยคทักทาย *</label>
+          <input type="text" id="custom-initial-msg-th" class="form-control" placeholder="เช่น สวัสดีจ้า! ยินดีต้อนรับสู่ร้านของเล่น อยากได้ของเล่นชิ้นไหนเอ่ย?">
+        </div>
+
+        <div class="form-group">
+          <label>10. ตัวอย่างประโยคให้เด็กฝึกพูด (ใส่ 1 ประโยคต่อ 1 บรรทัด)</label>
+          <textarea id="custom-prompts" class="form-control" rows="3" placeholder="I want the cute teddy bear!&#10;Can I play with the toy robot?&#10;How much is this puzzle?"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btn-cancel-custom-scenario">ยกเลิก</button>
+        <button class="btn btn-rainbow" id="btn-save-custom-scenario">
+          💾 บันทึกขึ้น Cloud Firestore
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Firebase Setup Modal -->
   <div class="modal-overlay" id="firebase-modal">
     <div class="modal-box">
       <div class="modal-header">
@@ -225,7 +335,7 @@
       </div>
       <div class="modal-body">
         <p class="form-help">
-          นำค่า <code>firebaseConfig</code> จาก <a href="https://console.firebase.google.com" target="_blank" rel="noopener" style="color: var(--primary); font-weight: 600;">Firebase Console</a> ในหน้า Project Settings &gt; General &gt; Your Apps มากรอกที่นี่:
+          นำค่า <code>firebaseConfig</code> จาก Firebase Console มากดบันทึกที่นี่:
         </p>
 
         <div class="form-group">
@@ -234,26 +344,23 @@
         </div>
         <div class="form-group">
           <label>Auth Domain</label>
-          <input type="text" id="fb-auth-domain" class="form-control" placeholder="your-project.firebaseapp.com">
+          <input type="text" id="fb-auth-domain" class="form-control" placeholder="engspeak-app.firebaseapp.com">
         </div>
         <div class="form-group">
           <label>Project ID *</label>
-          <input type="text" id="fb-project-id" class="form-control" placeholder="your-project-id">
+          <input type="text" id="fb-project-id" class="form-control" placeholder="engspeak-app">
         </div>
         <div class="form-group">
           <label>Storage Bucket</label>
-          <input type="text" id="fb-storage-bucket" class="form-control" placeholder="your-project.appspot.com">
+          <input type="text" id="fb-storage-bucket" class="form-control">
         </div>
         <div class="form-group">
           <label>Messaging Sender ID</label>
-          <input type="text" id="fb-messaging-id" class="form-control" placeholder="1234567890">
+          <input type="text" id="fb-messaging-id" class="form-control">
         </div>
         <div class="form-group">
           <label>App ID</label>
-          <input type="text" id="fb-app-id" class="form-control" placeholder="1:123456789:web:abcdef">
-        </div>
-        <div style="background: rgba(79, 70, 229, 0.08); padding: 0.75rem; border-radius: var(--radius-sm); font-size: 0.775rem;">
-          💡 <strong>หมายเหตุ:</strong> ระบบจะบันทึกค่านี้ไว้ในเบราว์เซอร์ของคุณ และซิงค์ประวัติกับ Google Login ไปยัง Cloud Firestore อัตโนมัติ
+          <input type="text" id="fb-app-id" class="form-control">
         </div>
       </div>
       <div class="modal-footer">
@@ -267,7 +374,7 @@
     </div>
   </div>
 
-  <!-- 2. Settings Modal (Voice & System) -->
+  <!-- 3. Settings Modal (Voice & System) -->
   <div class="modal-overlay" id="settings-modal">
     <div class="modal-box">
       <div class="modal-header">
@@ -283,18 +390,18 @@
           </select>
         </div>
         <div class="form-group">
-          <label>ความเร็วในการพูดของคู่สนทนา: <span id="setting-rate-val" style="color: var(--primary); font-weight: bold;">1.0x</span></label>
-          <input type="range" id="setting-rate" min="0.7" max="1.3" step="0.1" value="1.0" style="width: 100%; accent-color: var(--primary);">
-          <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted);">
-            <span>ช้า (0.7x)</span>
-            <span>ปกติ (1.0x)</span>
+          <label>ความเร็วในการพูดของคู่สนทนา: <span id="setting-rate-val" style="color: var(--primary); font-weight: bold;">0.9x</span></label>
+          <input type="range" id="setting-rate" min="0.6" max="1.3" step="0.1" value="0.9" style="width: 100%; accent-color: var(--primary);">
+          <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted); font-weight: 700;">
+            <span>ช้าๆ ชัดๆ (0.6x)</span>
+            <span>ปกติสำหรับเด็ก (0.9x)</span>
             <span>เร็ว (1.3x)</span>
           </div>
         </div>
         <div class="form-group">
           <label>Google Gemini API Key (ตัวเลือกเสริม)</label>
-          <input type="password" id="setting-gemini-key" class="form-control" placeholder="AIzaSy... (เว้นว่างไว้เพื่อใช้ Built-in AI)">
-          <span class="form-help">หากใส่ Gemini API Key ระบบจะใช้โมเดล Gemini 1.5 Flash ในการสนทนาอิสระและตรวจจับไวยากรณ์เชิงลึกยิ่งขึ้น</span>
+          <input type="password" id="setting-gemini-key" class="form-control" placeholder="AIzaSy... (เว้นว่างไว้เพื่อใช้ AI ในตัว)">
+          <span class="form-help">หากใส่ Gemini API Key ระบบจะใช้โมเดล Gemini 1.5 Flash ช่วยคิดคำตอบได้สนุกสนานยิ่งขึ้น</span>
         </div>
       </div>
       <div class="modal-footer">
@@ -305,24 +412,24 @@
     </div>
   </div>
 
-  <!-- 3. Profile & Google Login Modal -->
+  <!-- 4. Profile & Google Login Modal -->
   <div class="modal-overlay" id="profile-modal">
     <div class="modal-box">
       <div class="modal-header">
-        <h3>👤 ข้อมูลผู้ใช้งาน & บัญชี</h3>
+        <h3>👤 บัญชีผู้ใช้คนเก่ง</h3>
         <button class="modal-close" id="btn-close-profile-modal">&times;</button>
       </div>
       <div class="modal-body" style="text-align: center;">
-        <img id="modal-profile-avatar" src="https://api.dicebear.com/7.x/bottts/svg?seed=guest" alt="Profile Avatar" style="width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 0.75rem; box-shadow: var(--shadow-sm);">
-        <h3 id="modal-profile-name" style="font-size: 1.25rem; font-weight: 700;">Guest Learner</h3>
-        <p id="modal-profile-email" style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem;">Guest Mode (Local Only)</p>
+        <img id="modal-profile-avatar" src="https://api.dicebear.com/7.x/bottts/svg?seed=kid" alt="Profile Avatar" style="width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 0.75rem; box-shadow: var(--shadow-sm); border: 3px solid #bfdbfe;">
+        <h3 id="modal-profile-name" style="font-size: 1.35rem; font-weight: 800;">Guest Learner</h3>
+        <p id="modal-profile-email" style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem; font-weight: 600;">Guest Mode</p>
 
-        <div id="modal-profile-fb-notice" style="display: none; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); padding: 0.75rem; border-radius: var(--radius-sm); font-size: 0.8rem; margin-bottom: 1rem; text-align: left; color: #b45309;">
-          ⚠️ ยังไม่ได้เชื่อมต่อ Firebase ข้อมูลจะถูกบันทึกในเครื่องนี้เท่านั้น หากต้องการ Login ด้วย Google และซิงค์ขึ้น Cloud กรุณาตั้งค่า Firebase ก่อน
+        <div id="modal-profile-fb-notice" style="display: none; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); padding: 0.75rem; border-radius: var(--radius-sm); font-size: 0.85rem; margin-bottom: 1rem; text-align: left; color: #b45309; font-weight: 600;">
+          ⚠️ ข้อมูลจะถูกบันทึกในเครื่องนี้ เข้าสู่ระบบด้วย Google เพื่อซิงค์ดาวและคำศัพท์ขึ้น Cloud Firestore ได้เลย!
         </div>
 
         <div style="display: flex; flex-direction: column; gap: 0.75rem; align-items: center;">
-          <button class="btn btn-google" id="btn-modal-google-login" style="width: 100%; max-width: 280px;">
+          <button class="btn btn-google" id="btn-modal-google-login" style="width: 100%; max-width: 290px;">
             <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
             เข้าสู่ระบบด้วย Google
           </button>
@@ -334,29 +441,29 @@
     </div>
   </div>
 
-  <!-- 4. Add Custom Vocab Modal -->
+  <!-- 5. Add Custom Vocab Modal -->
   <div class="modal-overlay" id="add-vocab-modal">
     <div class="modal-box">
       <div class="modal-header">
-        <h3>➕ เพิ่มคำศัพท์ลงในคลัง</h3>
+        <h3>➕ จดคำศัพท์ใหม่ลงสมุด</h3>
         <button class="modal-close" id="btn-close-add-vocab-modal">&times;</button>
       </div>
       <div class="modal-body">
         <div class="form-group">
           <label>คำศัพท์ภาษาอังกฤษ (Word / Phrase) *</label>
-          <input type="text" id="vocab-input-word" class="form-control" placeholder="เช่น Appointment">
+          <input type="text" id="vocab-input-word" class="form-control" placeholder="เช่น Puppy">
         </div>
         <div class="form-group">
-          <label>คำอ่านสัทศาสตร์ (Phonetic)</label>
-          <input type="text" id="vocab-input-phonetic" class="form-control" placeholder="เช่น /əˈpɔɪnt.mənt/">
+          <label>คำอ่าน (Phonetic)</label>
+          <input type="text" id="vocab-input-phonetic" class="form-control" placeholder="เช่น /ˈpʌp.i/">
         </div>
         <div class="form-group">
           <label>ความหมายภาษาไทย (Meaning) *</label>
-          <input type="text" id="vocab-input-th" class="form-control" placeholder="เช่น การนัดหมาย">
+          <input type="text" id="vocab-input-th" class="form-control" placeholder="เช่น ลูกสุนัขแสนน่ารัก">
         </div>
         <div class="form-group">
           <label>ตัวอย่างประโยค (Example Sentence)</label>
-          <input type="text" id="vocab-input-example" class="form-control" placeholder="เช่น I'd like to schedule an appointment with Dr. Evans.">
+          <input type="text" id="vocab-input-example" class="form-control" placeholder="เช่น I love playing with my puppy.">
         </div>
       </div>
       <div class="modal-footer">

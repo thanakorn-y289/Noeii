@@ -135,43 +135,75 @@ export class UIController {
     }
   }
 
-  // ===================== SCENARIOS LIST =====================
+  // ===================== SCENARIOS LIST (KIDS & CUSTOM) =====================
 
-  renderScenarios() {
+  async renderScenarios() {
     const container = document.getElementById('scenarios-container');
     if (!container) return;
 
-    const filtered = SCENARIOS.filter(s => {
-      const matchLevel = this.filterLevel === 'all' || s.level.toLowerCase() === this.filterLevel.toLowerCase() || s.level === 'All Levels';
+    // Load custom scenarios from Firestore / Local cache
+    const customList = await dbService.getCustomScenarios();
+    this.allScenarios = [...customList, ...SCENARIOS];
+
+    const filtered = this.allScenarios.filter(s => {
+      let matchLevel = true;
+      if (this.filterLevel === 'p1-p3') {
+        matchLevel = (s.level || '').includes('1 - 3') || (s.level || '').includes('เริ่มต้น');
+      } else if (this.filterLevel === 'p4-p6') {
+        matchLevel = (s.level || '').includes('4 - 6') || (s.level || '').includes('ปานกลาง');
+      } else if (this.filterLevel === 'custom') {
+        matchLevel = Boolean(s.isCustom);
+      }
+
       const matchSearch = !this.searchQuery || 
         s.title.toLowerCase().includes(this.searchQuery.toLowerCase()) || 
-        s.titleTh.includes(this.searchQuery) ||
-        s.category.toLowerCase().includes(this.searchQuery.toLowerCase());
+        (s.titleTh && s.titleTh.includes(this.searchQuery)) ||
+        (s.category && s.category.toLowerCase().includes(this.searchQuery.toLowerCase()));
+
       return matchLevel && matchSearch;
     });
 
+    if (filtered.length === 0) {
+      container.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; background: #ffffff; border-radius: var(--radius-lg); border: 2px dashed #cbd5e1;">
+          <div style="font-size: 3rem; margin-bottom: 0.75rem;">🎨</div>
+          <h3>ยังไม่มีบทสนทนาในหมวดนี้</h3>
+          <p style="color: var(--text-muted); font-size: 0.95rem;">คุณครูหรือผู้ปกครองสามารถกดปุ่ม "สร้างบทสนทนาใหม่" ด้านบนเพื่อเพิ่มด่านได้เลยจ้า</p>
+        </div>
+      `;
+      return;
+    }
+
     container.innerHTML = filtered.map(s => {
-      const levelClass = s.level.toLowerCase().replace(' ', '-');
+      const isP1 = (s.level || '').includes('1 - 3');
+      const levelClass = isP1 ? 'p1-p3' : 'p4-p6';
       return `
-        <div class="scenario-card" data-id="${s.id}">
+        <div class="scenario-card ${s.isCustom ? 'custom-scenario' : ''}" data-id="${s.id}">
           <div class="scenario-header">
-            <div class="scenario-icon">${s.icon}</div>
+            <div class="scenario-icon">${s.icon || '🐻'}</div>
             <div class="scenario-badges">
-              <span class="badge-level ${levelClass}">${s.level}</span>
-              <span class="scenario-category">${s.category}</span>
+              <span class="badge-level ${levelClass}">${s.level || 'ประถม'}</span>
+              ${s.isCustom ? '<span class="badge-custom-tag">โดยคุณครู 🎨</span>' : ''}
             </div>
           </div>
-          <h3 class="scenario-title">${s.title}</h3>
-          <p class="scenario-title-th">${s.titleTh}</p>
-          <p class="scenario-description">${s.description}</p>
+          <h3 class="scenario-title">${this.escapeHtml(s.title)}</h3>
+          <p class="scenario-title-th">${this.escapeHtml(s.titleTh || '')}</p>
+          <p class="scenario-description">${this.escapeHtml(s.description || '')}</p>
           <div class="scenario-footer">
             <div class="scenario-partner">
-              <span class="scenario-partner-avatar">${s.partnerAvatar}</span>
-              <span><strong>${s.partnerName}</strong> (${s.partnerRole})</span>
+              <span class="scenario-partner-avatar">${s.partnerAvatar || '🐻'}</span>
+              <span><strong>${this.escapeHtml(s.partnerName)}</strong> (${this.escapeHtml(s.partnerRole)})</span>
             </div>
-            <button class="btn btn-primary btn-sm btn-start-scenario" data-id="${s.id}">
-              ฝึกสนทนา 🎙️
-            </button>
+            <div style="display: flex; gap: 0.35rem;">
+              <button class="btn btn-primary btn-sm btn-start-scenario" data-id="${s.id}">
+                เริ่มเล่น 🎙️
+              </button>
+              ${s.isCustom ? `
+                <button class="btn btn-secondary btn-sm btn-del-custom" data-id="${s.id}" title="ลบด่านนี้" style="color: var(--danger); padding: 0.4rem 0.6rem;">
+                  🗑️
+                </button>
+              ` : ''}
+            </div>
           </div>
         </div>
       `;
@@ -180,8 +212,22 @@ export class UIController {
     // Attach click events
     container.querySelectorAll('.scenario-card').forEach(card => {
       card.addEventListener('click', (e) => {
+        if (e.target.closest('.btn-del-custom')) return;
         const id = card.getAttribute('data-id');
         this.startScenario(id);
+      });
+    });
+
+    // Delete custom scenario
+    container.querySelectorAll('.btn-del-custom').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        if (confirm('คุณต้องการลบด่านนี้ออกจากระบบหรือไม่?')) {
+          await dbService.deleteCustomScenario(id);
+          modalController.showToast('ลบด่านเรียบร้อยแล้ว', 'info');
+          this.renderScenarios();
+        }
       });
     });
 
@@ -212,17 +258,20 @@ export class UIController {
     const stats = await dbService.getUserStats();
     const streakEl = document.getElementById('stat-streak');
     const countEl = document.getElementById('stat-practices');
-    const minEl = document.getElementById('stat-minutes');
+    const starsBanner = document.getElementById('stat-stars-banner');
+    const starsHeader = document.getElementById('header-stars-count');
 
+    const stars = stats.starsCount || 0;
+    if (starsBanner) starsBanner.textContent = `${stars} ⭐`;
+    if (starsHeader) starsHeader.textContent = `${stars}`;
     if (streakEl) streakEl.textContent = `${stats.streakDays || 1} 🔥`;
     if (countEl) countEl.textContent = stats.totalPractices || 0;
-    if (minEl) minEl.textContent = `${stats.totalMinutes || 0} นาที`;
   }
 
   // ===================== CHAT PRACTICE ROOM =====================
 
   startScenario(scenarioId) {
-    const scenario = SCENARIOS.find(s => s.id === scenarioId);
+    const scenario = (this.allScenarios || SCENARIOS).find(s => s.id === scenarioId) || SCENARIOS[0];
     if (!scenario) return;
 
     this.activeScenario = scenario;
@@ -484,6 +533,10 @@ export class UIController {
       // Speak partner reply
       speechService.speak(result.replyText);
 
+      // มอบ 1 ดาวเมื่อพูดจบแต่ละประโยค
+      await dbService.awardStar(1);
+      this.updateStatsBanner();
+
       if (statusText) statusText.textContent = 'แตะไมค์เพื่อพูด';
     } catch (e) {
       console.error('Error generating reply:', e);
@@ -511,7 +564,12 @@ export class UIController {
     };
 
     await dbService.saveConversation(sessionData);
-    modalController.showToast(`🎉 ฝึกสนทนาสำเร็จ! พูดไปทั้งหมด ${userTurns} ประโยค บันทึกสถิติแล้ว`, 'success');
+
+    // มอบดาวโบนัส +3 ดาวเมื่อเล่นจบด่าน!
+    const totalStars = await dbService.awardStar(3);
+    this.updateStatsBanner();
+
+    modalController.showToast(`🌟 สุดยอดมากคนเก่ง! ผ่านด่านแล้ว รับโบนัส +3 ดาวสะสม ⭐ (รวม ${totalStars} ดาว)`, 'success', 4500);
 
     if (returnToScenarios) {
       this.activeScenario = null;

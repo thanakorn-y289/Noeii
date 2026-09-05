@@ -55,6 +55,16 @@ class AIService {
     // ตรวจไวยากรณ์เบื้องต้น
     grammarFeedback = this.analyzeGrammar(userText);
 
+    // ตรวจสอบว่าเป็น Custom Scenario ของคุณครู/ผู้ปกครอง หรือไม่
+    if (scenario.isCustom) {
+      const prompts = scenario.suggestedPrompts || [];
+      const randPrompt = prompts.length > 0 ? prompts[Math.floor(Math.random() * prompts.length)] : "Tell me more!";
+      partnerReply = `Yay! That is wonderful, superstar! ⭐ ${scenario.partnerName} loves talking with you! What would you like to say next?`;
+      partnerReplyTh = `เย้! ยอดเยี่ยมมากคนเก่ง! ⭐ ${scenario.partnerName} ชอบคุยกับหนูมากเลย อยากพูดอะไรต่อดีจ๊ะ?`;
+      suggestions = prompts.slice(0, 3);
+      return { replyText: partnerReply, replyTextTh: partnerReplyTh, grammarFeedback, suggestedPrompts: suggestions };
+    }
+
     // Scenario-specific contextual logic
     switch (scenario.id) {
       case 'cafe-order': {
@@ -165,6 +175,100 @@ class AIService {
           partnerReply = "It appears to be a mild viral infection. I will prescribe some fever reducers and throat lozenges. Drink plenty of warm water, get lots of rest, and you should feel better in 2-3 days.";
           partnerReplyTh = "ดูเหมือนจะเป็นการติดเชื้อไวรัสไข้หวัดทั่วไปครับ หมอจะสั่งยาลดไข้และยาอมแก้เจ็บคอให้ ดื่มน้ำอุ่นมากๆ พักผ่อนให้เพียงพอ อาการจะดีขึ้นใน 2-3 วันครับ";
           suggestions = ["Thank you, doctor! Should I take them after meals?", "Do I need a medical certificate for work?", "Thank you for the advice."];
+        }
+        break;
+      }
+
+      case 'ice-cream-shop': {
+        if (lower.includes('chocolate') || lower.includes('vanilla') || lower.includes('strawberry') || lower.includes('flavor')) {
+          partnerReply = "Yum! That is my favorite too! Would you like that in a crunchy waffle cone or a little cup?";
+          partnerReplyTh = "ว้าว! รสนั้นอร่อยที่สุดเลย! อยากใส่โคนวาฟเฟิลกรุบกรอบ หรือใส่ถ้วยน่ารักๆ ดีจ๊ะ?";
+          suggestions = ["In a waffle cone, please!", "In a cup with a spoon, please!", "Can I get two scoops?"];
+        } else if (lower.includes('cone') || lower.includes('cup') || lower.includes('scoop')) {
+          partnerReply = "Great choice! Do you want rainbow sprinkles, chocolate chips, or sweet cherries on top?";
+          partnerReplyTh = "เลือกได้ยอดเยี่ยมมาก! อยากโรยเกล็ดน้ำตาลสายรุ้ง ช็อกโกแลตชิป หรือเชอร์รีหวานๆ ด้านบนไหมเอ่ย?";
+          suggestions = ["Rainbow sprinkles, please!", "Lots of chocolate chips!", "Extra cherries on top!"];
+        } else {
+          partnerReply = "Here is your super yummy ice cream! Enjoy your sweet treat, superstar!";
+          partnerReplyTh = "นี่จ้าไอศกรีมแสนอร่อย ทานให้อร่อยนะคนเก่ง!";
+          suggestions = ["Thank you so much!", "It looks so delicious!", "Yum yum, thank you!"];
+        }
+        break;
+      }
+
+      case 'cute-puppy': {
+        if (lower.includes('ball') || lower.includes('fetch') || lower.includes('catch') || lower.includes('throw')) {
+          partnerReply = "Woof! Woof! *wags tail happily* I caught the ball! Throw it high into the sky again!";
+          partnerReplyTh = "โฮ่งๆ! *กระดิกหางอย่างร่าเริง* บัดดี้คาบลูกบอลได้แล้ว! ปาขึ้นไปบนฟ้าสูงๆ อีกรอบสิ!";
+          suggestions = ["Good boy, Buddy!", "Catch it again!", "Run fast, Buddy!"];
+        } else if (lower.includes('good boy') || lower.includes('cute') || lower.includes('love') || lower.includes('hug')) {
+          partnerReply = "*happy barking* Buddy loves you so much! Can we run around the green grass together?";
+          partnerReplyTh = "*เห่าเสียงใส* บัดดี้ก็รักเธอเหมือนกัน! ไปวิ่งเล่นรอบสนามหญ้าสีเขียวด้วยกันไหม?";
+          suggestions = ["Yes, let's run together!", "You are my best furry friend!", "Sit down, Buddy!"];
+        } else {
+          partnerReply = "Woof! Playing with you is the most fun ever! Let's do it again!";
+          partnerReplyTh = "โฮ่ง! เล่นกับเธอสนุกที่สุดในโลกเลย! ไว้มาเล่นกันอีกนะ!";
+          suggestions = ["Bye bye, Buddy! See you tomorrow!", "You are the best puppy!"];
+        }
+        break;
+      }
+
+      case 'school-friends': {
+        if (lower.includes('blue') || lower.includes('pink') || lower.includes('yellow') || lower.includes('green') || lower.includes('color')) {
+          partnerReply = "Oh, that is such a pretty color! Let's color this big cute elephant together. What subject do you like most at school?";
+          partnerReplyTh = "โอ้โห สีสวยจังเลย! มาระบายสีน้องช้างตัวใหญ่ด้วยกันนะ แล้วที่โรงเรียนชอบเรียนวิชาอะไรที่สุดเหรอ?";
+          suggestions = ["I love Art and drawing!", "I like English and singing songs!", "My favorite is PE and sports!"];
+        } else if (lower.includes('art') || lower.includes('english') || lower.includes('math') || lower.includes('music')) {
+          partnerReply = "That is so cool! You are super smart! Can we share coloring pencils during recess?";
+          partnerReplyTh = "เจ๋งสุดๆ ไปเลย! เธอเก่งมากๆ เลยนะเนี่ย! ตอนพักเที่ยงเรามาแบ่งสีไม้กันระบายนะ?";
+          suggestions = ["Yes! Here is my yellow pencil.", "Let's draw together!", "You are a great friend!"];
+        } else {
+          partnerReply = "School is so much fun when we learn and play together! High five, friend!";
+          partnerReplyTh = "ไปโรงเรียนสนุกจังเลยเวลาได้เรียนและเล่นด้วยกัน แปะมือกันหน่อยเพื่อนรัก!";
+          suggestions = ["High five!", "See you in class!"];
+        }
+        break;
+      }
+
+      case 'space-adventure': {
+        if (lower.includes('moon') || lower.includes('mars') || lower.includes('planet') || lower.includes('star')) {
+          partnerReply = "Beep-boop! Engines ready! 3... 2... 1... Blast off! Look out the window, what do you see floating in space?";
+          partnerReplyTh = "บี๊บ-บู๊บ! เครื่องยนต์พร้อม! 3... 2... 1... พุ่งตัวสู่ยาน! มองออกไปนอกหน้าต่างสิ เห็นอะไรลอยอยู่ในอวกาศบ้าง?";
+          suggestions = ["I see the bright shining Moon!", "Look at that colorful nebula!", "There is a funny alien waving at us!"];
+        } else if (lower.includes('alien') || lower.includes('rocket') || lower.includes('fly')) {
+          partnerReply = "Beep! That is an alien saying hello from planet Zog! Should we wave our hands back and say hi?";
+          partnerReplyTh = "บี๊บ! นั่นคือเอเลี่ยนกำลังโบกมือทักทายจากดาวซ็อก! เราโบกมือและกล่าวทักทายเขากลับดีไหม?";
+          suggestions = ["Hello friendly alien!", "We come in peace!", "Welcome to our rocket!"];
+        } else {
+          partnerReply = "Mission accomplished, brave Astronaut! We explored the galaxy together. Ready to head back to Earth?";
+          partnerReplyTh = "ภารกิจสำเร็จแล้ว นักบินอวกาศผู้กล้าหาญ! เราสำรวจดาราจักรด้วยกัน พร้อมบินกลับสู่โลกหรือยัง?";
+          suggestions = ["Yes, let's fly back home!", "That was an epic adventure, Robi!"];
+        }
+        break;
+      }
+
+      case 'zoo-animals': {
+        if (lower.includes('giraffe') || lower.includes('lion') || lower.includes('elephant') || lower.includes('monkey') || lower.includes('animal')) {
+          partnerReply = "Look at them! Did you hear that sound? The baby elephant is splashing water with its long trunk! Isn't that funny?";
+          partnerReplyTh = "ดูนั่นสิ! ได้ยินเสียงนั้นไหม? ลูกช้างกำลังพ่นน้ำเล่นด้วยงวงยาวๆ น่ารักและตลกจังเลยเนอะ?";
+          suggestions = ["Haha! That is so funny!", "Look at the playful monkeys jumping!", "Can we feed the giraffes?"];
+        } else {
+          partnerReply = "The animals love visiting with you today! Which animal was your absolute favorite?";
+          partnerReplyTh = "พวกสัตว์ทั้งหลายดีใจมากเลยที่ได้เจอเธอวันนี้! ชอบสัตว์ตัวไหนมากที่สุดเอ่ย?";
+          suggestions = ["My favorite is the tall giraffe!", "I loved the cute baby elephant!", "The roaring lion was amazing!"];
+        }
+        break;
+      }
+
+      case 'pizza-party': {
+        if (lower.includes('cheese') || lower.includes('sausage') || lower.includes('mushroom') || lower.includes('pepperoni')) {
+          partnerReply = "Mmm! Chef Po is tossing the dough into the air! Wooosh! Let's put our pizza into the hot oven. How many slices should we cut?";
+          partnerReplyTh = "อื้มมม! เชฟโปกำลังโยนแป้งพิซซ่าขึ้นฟ้า ฟิ้ววว! เอาพิซซ่าเข้าเตาอบกันดีกว่า จะตัดแบ่งเป็นกี่ชิ้นดีเอ่ย?";
+          suggestions = ["Please cut it into 8 slices!", "4 big slices for us!", "Can I have the biggest slice?"];
+        } else {
+          partnerReply = "Ding! The pizza is golden, hot, and melted! Time for our pizza party! Dig in, little chef!";
+          partnerReplyTh = "ปิ๊ง! พิซซ่าอบเสร็จแล้ว หอมกรุ่น ชีสยืดเยิ้ม! ได้เวลาปาร์ตี้พิซซ่าแล้ว ลุยเลยเชฟตัวน้อย!";
+          suggestions = ["This is the best pizza ever!", "Thank you Chef Po!", "Delicious!"];
         }
         break;
       }

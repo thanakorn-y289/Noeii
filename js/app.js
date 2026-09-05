@@ -144,6 +144,25 @@ function wireGlobalEvents() {
     uiController.renderWordBank();
   });
 
+  // Custom Scenario Builder Modal (Teacher / Parent Mode)
+  document.getElementById('btn-open-custom-scenario')?.addEventListener('click', () => {
+    modalController.openCustomScenarioModal();
+  });
+
+  document.getElementById('btn-close-custom-scenario-modal')?.addEventListener('click', () => {
+    modalController.closeCustomScenarioModal();
+  });
+
+  document.getElementById('btn-cancel-custom-scenario')?.addEventListener('click', () => {
+    modalController.closeCustomScenarioModal();
+  });
+
+  document.getElementById('btn-save-custom-scenario')?.addEventListener('click', async () => {
+    await modalController.saveCustomScenarioFromForm(() => {
+      uiController.renderScenarios();
+    });
+  });
+
   // Close modals on clicking overlay background
   document.querySelectorAll('.modal-overlay').forEach(overlay => {
     overlay.addEventListener('click', (e) => {

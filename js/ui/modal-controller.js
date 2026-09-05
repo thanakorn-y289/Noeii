@@ -190,6 +190,93 @@ export class ModalController {
     const modal = document.getElementById('profile-modal');
     if (modal) modal.classList.remove('active');
   }
+
+  // ===================== CUSTOM SCENARIO BUILDER MODAL =====================
+
+  openCustomScenarioModal() {
+    const modal = document.getElementById('custom-scenario-modal');
+    if (!modal) return;
+
+    // Reset fields
+    document.getElementById('custom-title').value = '';
+    document.getElementById('custom-title-th').value = '';
+    document.getElementById('custom-partner-name').value = '';
+    document.getElementById('custom-partner-role').value = '';
+    document.getElementById('custom-description').value = '';
+    document.getElementById('custom-initial-msg').value = '';
+    document.getElementById('custom-initial-msg-th').value = '';
+    document.getElementById('custom-prompts').value = '';
+
+    // Emoji picker setup
+    const pills = document.querySelectorAll('#custom-emoji-picker .emoji-pill');
+    pills.forEach(p => {
+      p.onclick = () => {
+        pills.forEach(el => el.classList.remove('selected'));
+        p.classList.add('selected');
+      };
+    });
+
+    modal.classList.add('active');
+  }
+
+  closeCustomScenarioModal() {
+    const modal = document.getElementById('custom-scenario-modal');
+    if (modal) modal.classList.remove('active');
+  }
+
+  async saveCustomScenarioFromForm(onSuccess) {
+    const title = document.getElementById('custom-title')?.value.trim();
+    const titleTh = document.getElementById('custom-title-th')?.value.trim();
+    const level = document.getElementById('custom-level')?.value || 'ประถม 1 - 3';
+    const partnerName = document.getElementById('custom-partner-name')?.value.trim();
+    const partnerRole = document.getElementById('custom-partner-role')?.value.trim();
+    const description = document.getElementById('custom-description')?.value.trim() || title;
+    const initialMessage = document.getElementById('custom-initial-msg')?.value.trim();
+    const initialMessageTh = document.getElementById('custom-initial-msg-th')?.value.trim();
+    const promptsRaw = document.getElementById('custom-prompts')?.value.trim();
+
+    const selectedEmojiEl = document.querySelector('#custom-emoji-picker .emoji-pill.selected');
+    const icon = selectedEmojiEl ? selectedEmojiEl.getAttribute('data-emoji') : '🐻';
+
+    if (!title || !titleTh || !partnerName || !partnerRole || !initialMessage || !initialMessageTh) {
+      this.showToast('กรุณากรอกข้อมูลด่านให้ครบถ้วน (ชื่อด่าน, ตัวละคร, และประโยคทักทาย)', 'warning');
+      return false;
+    }
+
+    const suggestedPrompts = promptsRaw
+      ? promptsRaw.split('\n').map(p => p.trim()).filter(p => p.length > 0)
+      : ["Hello!", "Nice to meet you!"];
+
+    const scenarioData = {
+      title,
+      titleTh,
+      level,
+      category: 'Custom By Teacher',
+      icon,
+      partnerAvatar: icon,
+      partnerName,
+      partnerRole,
+      description,
+      descriptionTh: description,
+      initialMessage,
+      initialMessageTh,
+      learningGoals: [title, `Talk with ${partnerName}`],
+      suggestedPrompts,
+      vocabularyList: []
+    };
+
+    try {
+      const { dbService } = await import('../services/db-service.js');
+      await dbService.saveCustomScenario(scenarioData);
+      this.showToast('🎉 บันทึกด่านใหม่ขึ้น Cloud สำเร็จแล้ว! พร้อมให้เด็กๆ ฝึกพูดทันที', 'success');
+      this.closeCustomScenarioModal();
+      if (onSuccess) onSuccess();
+      return true;
+    } catch (err) {
+      this.showToast('เกิดข้อผิดพลาดในการบันทึก: ' + err.message, 'error');
+      return false;
+    }
+  }
 }
 
 export const modalController = new ModalController();
