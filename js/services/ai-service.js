@@ -1,0 +1,333 @@
+/**
+ * AI Dialogue & Feedback Engine
+ * จัดการการโต้ตอบบทสนทนา ตรวจไวยากรณ์ คำแนะนำ และการแปล
+ * (รองรับทั้ง Built-in Scenario Engine และเชื่อมต่อ Gemini API เสริม)
+ */
+
+class AIService {
+  constructor() {
+    this.geminiApiKey = localStorage.getItem('eng_practice_gemini_api_key') || '';
+  }
+
+  setGeminiApiKey(key) {
+    this.geminiApiKey = (key || '').trim();
+    if (this.geminiApiKey) {
+      localStorage.setItem('eng_practice_gemini_api_key', this.geminiApiKey);
+    } else {
+      localStorage.removeItem('eng_practice_gemini_api_key');
+    }
+  }
+
+  getGeminiApiKey() {
+    return this.geminiApiKey;
+  }
+
+  /**
+   * ส่งข้อความของผู้ใช้และรับคำตอบของคู่สนทนา พร้อมคำแนะนำไวยากรณ์และการแปล
+   */
+  async generateReply(scenario, messageHistory, userMessage) {
+    // หากมี Gemini API Key ให้ลองเรียกใช้ Gemini ก่อน
+    if (this.geminiApiKey) {
+      try {
+        const geminiResult = await this.callGeminiApi(scenario, messageHistory, userMessage);
+        if (geminiResult) return geminiResult;
+      } catch (e) {
+        console.warn('Gemini API call failed, falling back to built-in dialogue engine:', e);
+      }
+    }
+
+    // Built-in Smart Dialogue Engine
+    return this.generateBuiltinReply(scenario, messageHistory, userMessage);
+  }
+
+  /**
+   * Built-in Dialogue Engine (ไม่ต้องใช้ API Key รันได้ทันทีและออฟไลน์)
+   */
+  generateBuiltinReply(scenario, history, userText) {
+    const lower = userText.toLowerCase().trim();
+    const turnCount = history.filter(m => m.sender === 'user').length;
+
+    let partnerReply = "";
+    let partnerReplyTh = "";
+    let grammarFeedback = null;
+    let suggestions = [];
+
+    // ตรวจไวยากรณ์เบื้องต้น
+    grammarFeedback = this.analyzeGrammar(userText);
+
+    // Scenario-specific contextual logic
+    switch (scenario.id) {
+      case 'cafe-order': {
+        if (lower.includes('latte') || lower.includes('americano') || lower.includes('coffee') || lower.includes('tea') || lower.includes('cappuccino')) {
+          if (lower.includes('oat') || lower.includes('sugar') || lower.includes('ice') || lower.includes('hot')) {
+            partnerReply = "Got it! That sounds delicious. Would you like to pair that with any freshly baked croissants or muffins today?";
+            partnerReplyTh = "รับทราบครับ! เครื่องดื่มน่าทานมากเลย วันนี้รับครัวซองต์หรือมัฟฟินอบสดใหม่ทานคู่กันไหมครับ?";
+            suggestions = ["No thank you, just the drink.", "A chocolate croissant would be great!", "How much does that come to?"];
+          } else {
+            partnerReply = "Sure thing! What size would you prefer: small, medium, or large? And would you like that hot or iced?";
+            partnerReplyTh = "ได้เลยครับ! รับขนาดไหนดีครับ เล็ก กลาง หรือใหญ่? และรับเป็นร้อนหรือเย็นดีครับ?";
+            suggestions = ["Medium iced, please.", "Large hot with oat milk, please.", "Just a small hot one."];
+          }
+        } else if (lower.includes('croissant') || lower.includes('muffin') || lower.includes('pastry') || lower.includes('cake')) {
+          partnerReply = "Excellent choice, I will heat that up for you right away. That will be $7.50 in total. How would you like to pay today?";
+          partnerReplyTh = "เลือกได้เยี่ยมเลยครับ เดี๋ยวผมอุ่นร้อนให้นะครับ ทั้งหมด 7.50 ดอลลาร์ วันนี้ชำระเงินแบบไหนดีครับ?";
+          suggestions = ["Can I pay with credit card / Apple Pay?", "Here is cash, keep the change.", "Do you take contactless payment?"];
+        } else if (lower.includes('card') || lower.includes('cash') || lower.includes('pay') || lower.includes('apple pay') || lower.includes('dollar')) {
+          partnerReply = "Payment approved! Here is your receipt. Your drink will be ready at the counter on your left in about two minutes. Have a wonderful day!";
+          partnerReplyTh = "ชำระเงินเรียบร้อยครับ! นี่ใบเสร็จครับ เครื่องดื่มจะพร้อมที่เคาน์เตอร์ด้านซ้ายในอีก 2 นาที ขอให้เป็นวันที่ดีนะครับ!";
+          suggestions = ["Thank you so much! Have a great day.", "Thanks Alex, see you next time!"];
+        } else {
+          partnerReply = "Certainly! Is there anything else I can add to your order, or are you ready for the total?";
+          partnerReplyTh = "ยินดีครับ! มีอะไรรับเพิ่มอีกไหมครับ หรือพร้อมชำระเงินเลย?";
+          suggestions = ["That will be all, thank you.", "Can I also get a bottle of water?", "Could I have the receipt, please?"];
+        }
+        break;
+      }
+
+      case 'hotel-checkin': {
+        if (lower.includes('reservation') || lower.includes('book') || lower.includes('name')) {
+          partnerReply = "Thank you! I found your booking. May I please see your ID or passport, and a credit card for the incidental deposit?";
+          partnerReplyTh = "ขอบคุณค่ะ! พบข้อมูลการจองแล้ว ขออนุญาตขอดูบัตรประชาชนหรือพาสปอร์ต และบัตรเครดิตสำหรับมัดจำความเสียหายค่ะ";
+          suggestions = ["Sure, here is my passport and credit card.", "Here you go.", "How much is the incidental deposit?"];
+        } else if (lower.includes('view') || lower.includes('floor') || lower.includes('quiet') || lower.includes('upgrade')) {
+          partnerReply = "I have a lovely quiet room on the 18th floor with a scenic city view! Breakfast is served from 6:30 to 10:00 AM on the 2nd floor. Here are your key cards.";
+          partnerReplyTh = "ได้ห้องชั้น 18 เงียบสงบพร้อมวิวเมืองสวยงามค่ะ! อาหารเช้าเปิด 6:30 ถึง 10:00 น. ชั้น 2 นี่คีย์การ์ดค่ะ";
+          suggestions = ["Thank you so much! What is the Wi-Fi password?", "Where is the elevator located?", "Can I request a late check-out?"];
+        } else if (lower.includes('wifi') || lower.includes('internet') || lower.includes('password') || lower.includes('elevator')) {
+          partnerReply = "The elevators are just past the lounge on your right. The Wi-Fi is free and the network name is 'HorizonGuest' with no password needed. Enjoy your stay!";
+          partnerReplyTh = "ลิฟต์อยู่ถัดจากเลานจ์ด้านขวามือค่ะ ไวไฟฟรีใช้ชื่อ HorizonGuest ได้เลยโดยไม่ต้องใส่รหัสผ่าน ขอให้พักผ่อนอย่างมีความสุขนะคะ!";
+          suggestions = ["Thank you for your help!", "Have a wonderful day."];
+        } else {
+          partnerReply = "Certainly! We also have a 24-hour gym and rooftop swimming pool on the top floor. Is there anything else you'd like to know?";
+          partnerReplyTh = "ยินดีค่ะ ทางเรามีฟิตเนส 24 ชม. และสระว่ายน้ำบนดาดฟ้าชั้นบนสุดด้วยนะคะ มีอะไรสอบถามเพิ่มเติมไหมคะ?";
+          suggestions = ["That's all for now, thank you!", "What time is checkout tomorrow?"];
+        }
+        break;
+      }
+
+      case 'airport-immigration': {
+        if (lower.includes('tourist') || lower.includes('tourism') || lower.includes('vacation') || lower.includes('holiday') || lower.includes('visit')) {
+          partnerReply = "Welcome. How long do you plan to stay in the country, and where will you be staying?";
+          partnerReplyTh = "ยินดีต้อนรับครับ วางแผนจะพำนักอยู่ในประเทศนานแค่ไหน และจะพักที่ไหนครับ?";
+          suggestions = ["I will be staying for 7 days at the Grand Horizon Hotel.", "Just for two weeks in Bangkok and Chiang Mai.", "I have a hotel booking confirmed."];
+        } else if (lower.includes('day') || lower.includes('week') || lower.includes('hotel') || lower.includes('stay')) {
+          partnerReply = "Do you have a confirmed return flight ticket back home? And do you have anything to declare to customs?";
+          partnerReplyTh = "มีตั๋วเครื่องบินขากลับที่ยืนยันแล้วไหมครับ? และมีสิ่งของที่ต้องสำแดงต่อศุลกากรหรือไม่?";
+          suggestions = ["Yes, here is my return ticket for next Sunday.", "No, I have nothing to declare.", "I have some gifts, but nothing taxable."];
+        } else {
+          partnerReply = "Everything looks in order. Please place your right thumb on the fingerprint scanner and look directly into the camera... Done! Enjoy your visit.";
+          partnerReplyTh = "เอกสารเรียบร้อยครับ กรุณาวางนิ้วโป้งขวาบนเครื่องสแกนและมองกล้องครับ... เรียบร้อยครับ ขอให้เที่ยวให้สนุกครับ!";
+          suggestions = ["Thank you very much, officer!", "Have a good day."];
+        }
+        break;
+      }
+
+      case 'job-interview': {
+        if (lower.includes('experience') || lower.includes('background') || lower.includes('work') || lower.includes('degree') || lower.includes('years')) {
+          partnerReply = "That's impressive experience. What would you say is your greatest technical or teamwork strength, and could you give a quick example?";
+          partnerReplyTh = "เป็นประสบการณ์ที่น่าประทับใจครับ คุณคิดว่าอะไรคือจุดแข็งที่สุดด้านเทคนิคหรือการทำงานเป็นทีม และช่วยยกตัวอย่างสั้นๆ ได้ไหมครับ?";
+          suggestions = ["My strength is problem-solving under tight deadlines.", "I excel at cross-functional communication and modern web technologies.", "I love mentoring junior colleagues."];
+        } else if (lower.includes('strength') || lower.includes('problem') || lower.includes('learn') || lower.includes('team')) {
+          partnerReply = "That's a very valuable skill for our team. Why are you interested in joining our company specifically?";
+          partnerReplyTh = "นั่นเป็นทักษะที่มีค่ามากสำหรับทีมเราเลยครับ แล้วอะไรทำให้คุณสนใจอยากมาร่วมงานกับบริษัทเราโดยเฉพาะครับ?";
+          suggestions = ["I really admire your commitment to user-centric innovation.", "Your company culture and rapid growth really resonate with my career goals.", "I want to take on new challenges with top-tier engineers."];
+        } else {
+          partnerReply = "Thank you for sharing your thoughts so clearly. Do you have any questions for me about the role, team, or our company culture?";
+          partnerReplyTh = "ขอบคุณที่แบ่งปันมุมมองอย่างชัดเจนครับ คุณมีคำถามอะไรจะถามผมเกี่ยวกับตำแหน่งงาน ทีม หรือวัฒนธรรมองค์กรไหมครับ?";
+          suggestions = ["What does a typical day look like in this role?", "What are the opportunities for career growth?", "How does the team handle new challenges?"];
+        }
+        break;
+      }
+
+      case 'casual-friends': {
+        if (lower.includes('busy') || lower.includes('good') || lower.includes('great') || lower.includes('fine') || lower.includes('work')) {
+          partnerReply = "I know the feeling! Work has been pretty hectic on my end too. Did you manage to catch any good shows or try any good food recently?";
+          partnerReplyTh = "เข้าใจเลย! ทางนี้งานก็ยุ่งพอกันเลย ช่วงนี้ได้ดูซีรีส์เรื่องไหนสนุกๆ หรือไปลองกินอะไรอร่อยๆ มาบ้างไหม?";
+          suggestions = ["I tried a great Thai restaurant downtown last week!", "I watched an awesome sci-fi movie over the weekend.", "Not much, just resting at home."];
+        } else if (lower.includes('food') || lower.includes('restaurant') || lower.includes('movie') || lower.includes('weekend') || lower.includes('travel')) {
+          partnerReply = "Oh that sounds fantastic! We should definitely plan a hangout together soon. Are you free next weekend for coffee or brunch?";
+          partnerReplyTh = "โอ้ ฟังดูเยี่ยมมากเลย! เราน่าจะนัดเจอกันเร็วๆ นี้นะ วันหยุดสุดสัปดาห์หน้าว่างไปกินกาแฟหรือบรันช์ด้วยกันไหม?";
+          suggestions = ["Sounds like a plan! Saturday morning works great for me.", "I'd love that, let's keep in touch!", "Let me check my calendar and text you."];
+        } else {
+          partnerReply = "Haha, totally agree with you! It's always so nice catching up with you. Let's make sure we chat more often!";
+          partnerReplyTh = "ฮ่าๆ เห็นด้วยเลย! ได้คุยอัปเดตกันแบบนี้ดีจัง ไว้คุยกันบ่อยๆ นะ!";
+          suggestions = ["Definitely! Take care and talk soon.", "Same here, enjoy the rest of your day!"];
+        }
+        break;
+      }
+
+      case 'doctor-visit': {
+        if (lower.includes('throat') || lower.includes('fever') || lower.includes('headache') || lower.includes('pain') || lower.includes('cough')) {
+          partnerReply = "I see. Let me check your temperature and have a look at your throat. Have you taken any over-the-counter medicine yet, or do you have any drug allergies?";
+          partnerReplyTh = "เข้าใจแล้วครับ ขอวัดไข้และตรวจดูในลำคอหน่อยนะครับ ก่อนหน้านี้ได้ทานยาอะไรมาบ้างหรือยัง และมีประวัติแพ้ยาไหมครับ?";
+          suggestions = ["I took some paracetamol yesterday.", "No known drug allergies.", "I haven't taken any medicine yet."];
+        } else {
+          partnerReply = "It appears to be a mild viral infection. I will prescribe some fever reducers and throat lozenges. Drink plenty of warm water, get lots of rest, and you should feel better in 2-3 days.";
+          partnerReplyTh = "ดูเหมือนจะเป็นการติดเชื้อไวรัสไข้หวัดทั่วไปครับ หมอจะสั่งยาลดไข้และยาอมแก้เจ็บคอให้ ดื่มน้ำอุ่นมากๆ พักผ่อนให้เพียงพอ อาการจะดีขึ้นใน 2-3 วันครับ";
+          suggestions = ["Thank you, doctor! Should I take them after meals?", "Do I need a medical certificate for work?", "Thank you for the advice."];
+        }
+        break;
+      }
+
+      default: { // Free talk
+        partnerReply = `That's an interesting point! You mentioned "${userText.slice(0, 35)}...". Could you elaborate a bit more on what inspired your perspective?`;
+        partnerReplyTh = `เป็นประเด็นที่น่าสนใจครับ! คุณกล่าวถึงเรื่องนี้ อยากให้ลองอธิบายขยายความเพิ่มเติมอีกนิดได้ไหมครับ?`;
+        suggestions = ["Let me explain in more detail...", "What do you think about that?", "In my opinion, it makes a big difference."];
+        break;
+      }
+    }
+
+    return {
+      replyText: partnerReply,
+      replyTextTh: partnerReplyTh,
+      grammarFeedback,
+      suggestedPrompts: suggestions
+    };
+  }
+
+  /**
+   * ตรวจสอบไวยากรณ์และให้คำแนะนำแบบ Real-time
+   */
+  analyzeGrammar(text) {
+    const trimmed = text.trim();
+    if (!trimmed) return null;
+
+    const lower = trimmed.toLowerCase();
+    const suggestions = [];
+
+    // Simple common mistake detectors for Thai English learners
+    if (/\bi go to\b/i.test(trimmed) && (lower.includes('yesterday') || lower.includes('last week') || lower.includes('ago'))) {
+      suggestions.push({
+        issue: "Past tense used with present verb",
+        original: "I go to...",
+        better: "I went to...",
+        explanation: "เมื่อพูดถึงเหตุการณ์ในอดีต (yesterday/last week) ให้เปลี่ยนกริยาเป็นรูป Past Simple (went)"
+      });
+    }
+
+    if (/\bi am agree\b/i.test(trimmed)) {
+      suggestions.push({
+        issue: "Common error: 'I am agree'",
+        original: "I am agree",
+        better: "I agree",
+        explanation: "'agree' เป็นคำกริยา (Verb) อยู่แล้ว ไม่ต้องใส่ Verb to be (am) ข้างหน้า"
+      });
+    }
+
+    if (/\bdelicious much\b/i.test(trimmed) || /\bvery much delicious\b/i.test(trimmed)) {
+      suggestions.push({
+        issue: "Word order",
+        original: "delicious much",
+        better: "very delicious / so delicious",
+        explanation: "ใช้ 'very delicious' หรือ 'really delicious' แทน"
+      });
+    }
+
+    if (/\bhe don't\b/i.test(trimmed) || /\bshe don't\b/i.test(trimmed) || /\bit don't\b/i.test(trimmed)) {
+      suggestions.push({
+        issue: "Subject-verb agreement",
+        original: "he/she don't",
+        better: "he/she doesn't",
+        explanation: "ประธานเอกพจน์ (He/She/It) ต้องใช้กริยาปฏิเสธเป็น 'doesn't'"
+      });
+    }
+
+    if (suggestions.length > 0) {
+      return {
+        status: 'has_suggestion',
+        items: suggestions
+      };
+    }
+
+    // Positive reinforcement if no glaring mistakes
+    if (trimmed.split(' ').length >= 4) {
+      return {
+        status: 'great',
+        items: [{
+          issue: "Natural sentence structure!",
+          original: trimmed,
+          better: trimmed,
+          explanation: "รูปประโยคชัดเจน สื่อสารได้คล่องแคล่วและเป็นธรรมชาติมากครับ"
+        }]
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * เรียก Google Gemini API (ถ้าผู้ใช้ใส่ API Key ไว้)
+   */
+  async callGeminiApi(scenario, history, userText) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.geminiApiKey}`;
+
+    const systemPrompt = `You are playing the role of ${scenario.partnerName}, a ${scenario.partnerRole} in an English conversation practice app for English learners.
+Scenario: ${scenario.title}.
+Your goal: Help the user practice natural English speaking. Respond conversationally in natural English (keep responses concise, around 2-3 sentences), ask engaging follow-ups, and provide a Thai translation of your response.
+Also analyze the user's sentence for grammar improvements or more natural native phrasings.
+
+Output must strictly be valid JSON format matching this schema:
+{
+  "replyText": "your English response here",
+  "replyTextTh": "คำแปลไทยของคำตอบของคุณ",
+  "grammarTip": "คำแนะนำสั้นๆ ถ้าประโยคของผู้ใช้สามารถพูดให้เป็นธรรมชาติขึ้นได้ หรือคำชมถ้าดีอยู่แล้ว",
+  "suggestedPrompts": ["ทางเลือกประโยคที่ผู้เรียนสามารถพูดตอบกลับได้ 1", "ทางเลือก 2", "ทางเลือก 3"]
+}`;
+
+    const contents = [
+      { role: 'user', parts: [{ text: systemPrompt }] }
+    ];
+
+    // History
+    history.slice(-6).forEach(m => {
+      contents.push({
+        role: m.sender === 'user' ? 'user' : 'model',
+        parts: [{ text: m.text }]
+      });
+    });
+
+    contents.push({
+      role: 'user',
+      parts: [{ text: userText }]
+    });
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents,
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.7
+        }
+      })
+    });
+
+    if (!resp.ok) {
+      throw new Error(`Gemini API error: ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (rawText) {
+      const parsed = JSON.parse(rawText);
+      return {
+        replyText: parsed.replyText,
+        replyTextTh: parsed.replyTextTh,
+        grammarFeedback: parsed.grammarTip ? {
+          status: 'has_suggestion',
+          items: [{
+            issue: 'AI Coach Feedback',
+            original: userText,
+            better: '',
+            explanation: parsed.grammarTip
+          }]
+        } : null,
+        suggestedPrompts: parsed.suggestedPrompts || []
+      };
+    }
+    return null;
+  }
+}
+
+export const aiService = new AIService();
