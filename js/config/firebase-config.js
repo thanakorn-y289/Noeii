@@ -5,12 +5,13 @@
 
 // ใส่ค่า Config จาก Firebase Console ของคุณที่นี่ (หรือกรอกผ่านหน้าต่าง Settings บนเว็บ)
 export const DEFAULT_FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyAiJfZ1IpVaoGZwBJrfLcU9RNOY8wLYow4",
+  authDomain: "engspeak-app.firebaseapp.com",
+  projectId: "engspeak-app",
+  storageBucket: "engspeak-app.firebasestorage.app",
+  messagingSenderId: "983170251531",
+  appId: "1:983170251531:web:75e8a1f1cbd6a5ac39800e",
+  measurementId: "G-Q1WN8Z20Q3"
 };
 
 const STORAGE_KEY = 'eng_practice_firebase_config';
