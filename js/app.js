@@ -9,24 +9,26 @@ import { uiController } from './ui/ui-controller.js';
 import { modalController } from './ui/modal-controller.js';
 import { isFirebaseConfigured } from './config/firebase-config.js';
 
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
   // 1. Setup Theme (Dark / Light)
   initTheme();
 
-  // 2. Initialize UI Controller
+  // 2. Wire Global Modal & Event Listeners ทันที (ไม่ต้องรอ Network/Firebase)
+  wireGlobalEvents();
+
+  // 3. Expose helpers to window
+  window.modalController = modalController;
+  window.openCustomScenarioModal = () => modalController.openCustomScenarioModal();
+
+  // 4. Initialize UI Controller
   uiController.init();
 
-  // 3. Initialize Firebase Auth
-  try {
-    await authService.init((user) => {
-      uiController.updateUserUI(user);
-    });
-  } catch (e) {
+  // 5. Initialize Firebase Auth (ทำงานใน Background)
+  authService.init((user) => {
+    uiController.updateUserUI(user);
+  }).catch((e) => {
     console.warn('Auth init failed:', e);
-  }
-
-  // 4. Wire Global Modal & Event Listeners
-  wireGlobalEvents();
+  });
 });
 
 function initTheme() {

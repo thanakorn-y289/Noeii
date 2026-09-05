@@ -195,17 +195,24 @@ export class ModalController {
 
   openCustomScenarioModal() {
     const modal = document.getElementById('custom-scenario-modal');
-    if (!modal) return;
+    if (!modal) {
+      console.error('Modal #custom-scenario-modal not found');
+      return;
+    }
 
-    // Reset fields
-    document.getElementById('custom-title').value = '';
-    document.getElementById('custom-title-th').value = '';
-    document.getElementById('custom-partner-name').value = '';
-    document.getElementById('custom-partner-role').value = '';
-    document.getElementById('custom-description').value = '';
-    document.getElementById('custom-initial-msg').value = '';
-    document.getElementById('custom-initial-msg-th').value = '';
-    document.getElementById('custom-prompts').value = '';
+    // Reset fields safely
+    const setVal = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.value = val;
+    };
+    setVal('custom-title', '');
+    setVal('custom-title-th', '');
+    setVal('custom-partner-name', '');
+    setVal('custom-partner-role', '');
+    setVal('custom-description', '');
+    setVal('custom-initial-msg', '');
+    setVal('custom-initial-msg-th', '');
+    setVal('custom-prompts', '');
 
     // Emoji picker setup
     const pills = document.querySelectorAll('#custom-emoji-picker .emoji-pill');
