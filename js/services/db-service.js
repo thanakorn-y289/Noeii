@@ -5,6 +5,7 @@
 
 import { isFirebaseConfigured, getFirebaseConfig } from '../config/firebase-config.js';
 import { authService } from './auth-service.js';
+import { SCENARIOS } from '../data/scenarios.js';
 
 const FIREBASE_APP_URL = 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
 const FIREBASE_FIRESTORE_URL = 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
@@ -307,7 +308,63 @@ class DbService {
 
   // ===================== CUSTOM SCENARIOS (FOR TEACHERS / ADMINS) =====================
 
-  async saveCustomScenario(data) {
+  // ===================== SCENARIOS MANAGEMENT (EDIT & DELETE ALL) =====================
+
+  /**
+   * ดึงรายการ ID ด่านที่ถูกลบ (ทั้งบน Local และ Firestore)
+   */
+  async getDeletedScenarioIds() {
+    const localDeleted = this.getLocalList('deleted_scenario_ids');
+    if (isFirebaseConfigured()) {
+      try {
+        const fs = await this.getFirestore();
+        if (fs) {
+          const { doc, getDoc } = fs.mods;
+          const metaDoc = await getDoc(doc(fs.db, 'meta', 'deleted_scenarios'));
+          if (metaDoc.exists()) {
+            const remoteDeleted = metaDoc.data().ids || [];
+            const merged = [...new Set([...localDeleted, ...remoteDeleted])];
+            localStorage.setItem('deleted_scenario_ids', JSON.stringify(merged));
+            return merged;
+          }
+        }
+      } catch (e) {
+        console.warn('Firestore fetch deleted scenarios error:', e);
+      }
+    }
+    return localDeleted;
+  }
+
+  /**
+   * ดึงบทสนทนาทั้งหมด (ด่านเริ่มต้น + ด่านที่สร้าง/แก้ไข - ด่านที่ถูกลบ)
+   */
+  async getAllScenarios() {
+    const customList = await this.getCustomScenarios();
+    const deletedIds = await this.getDeletedScenarioIds();
+
+    // รวมด่านเริ่มต้น (SCENARIOS) เข้ากับ Custom Scenarios
+    // หากด่านเริ่มต้นถูกแก้ไข (มี id เดียวกันใน customList) ให้นำเวอร์ชันที่แก้ไขมาแทนที่
+    const scenarioMap = new Map();
+
+    // 1. ใส่ด่านเริ่มต้น
+    SCENARIOS.forEach(s => {
+      scenarioMap.set(s.id, { ...s, isCustom: false });
+    });
+
+    // 2. ใส่ Custom/Edited Scenarios (ทับด่านเดิมหรือเพิ่มด่านใหม่)
+    customList.forEach(s => {
+      scenarioMap.set(s.id, { ...s, isCustom: true });
+    });
+
+    // 3. กรองด่านที่อยู่ใน deletedIds ออก
+    const all = Array.from(scenarioMap.values()).filter(s => !deletedIds.includes(s.id));
+    return all;
+  }
+
+  /**
+   * บันทึกหรืออัปเดตบทสนทนา (ด่านเริ่มต้นที่ถูกแก้ไข หรือด่านที่สร้างขึ้นใหม่)
+   */
+  async saveScenario(data) {
     const user = authService.getCurrentUser();
     const id = data.id || `custom_${Date.now()}`;
     const scenario = {
@@ -317,8 +374,29 @@ class DbService {
       userId: user?.uid || null,
       userEmail: user?.email || null,
       createdBy: user?.displayName || user?.email || 'Teacher/Parent',
-      createdAt: new Date().toISOString()
+      updatedAt: new Date().toISOString()
     };
+    if (!scenario.createdAt) {
+      scenario.createdAt = new Date().toISOString();
+    }
+
+    // หากเคยอยู่ในรายการลบ ให้นำออกจากรายการลบ
+    const deletedList = this.getLocalList('deleted_scenario_ids');
+    if (deletedList.includes(id)) {
+      const updatedDeleted = deletedList.filter(did => did !== id);
+      localStorage.setItem('deleted_scenario_ids', JSON.stringify(updatedDeleted));
+      if (isFirebaseConfigured()) {
+        try {
+          const fs = await this.getFirestore();
+          if (fs) {
+            const { doc, setDoc } = fs.mods;
+            await setDoc(doc(fs.db, 'meta', 'deleted_scenarios'), { ids: updatedDeleted }, { merge: true });
+          }
+        } catch (e) {
+          console.warn('Firestore update deleted error:', e);
+        }
+      }
+    }
 
     // บันทึกลง Local Cache
     const local = this.getLocalList('custom_scenarios_all');
@@ -326,7 +404,7 @@ class DbService {
     filtered.unshift(scenario);
     localStorage.setItem('custom_scenarios_all', JSON.stringify(filtered));
 
-    // บันทึกขึ้น Cloud Firestore ในคอลเลกชันส่วนกลาง 'custom_scenarios'
+    // บันทึกขึ้น Cloud Firestore ในคอลเลกชัน 'custom_scenarios'
     if (isFirebaseConfigured()) {
       try {
         const fs = await this.getFirestore();
@@ -336,11 +414,16 @@ class DbService {
           await setDoc(scenarioDoc, scenario);
         }
       } catch (err) {
-        console.error('Firestore save custom scenario error:', err);
+        console.error('Firestore save scenario error:', err);
       }
     }
 
     return scenario;
+  }
+
+  // Alias for backward compatibility
+  async saveCustomScenario(data) {
+    return this.saveScenario(data);
   }
 
   async getCustomScenarios() {
@@ -348,7 +431,7 @@ class DbService {
       try {
         const fs = await this.getFirestore();
         if (fs) {
-          const { collection, getDocs, query, orderBy } = fs.mods;
+          const { collection, getDocs } = fs.mods;
           const col = collection(fs.db, 'custom_scenarios');
           const snapshot = await getDocs(col);
           const list = [];
@@ -366,24 +449,65 @@ class DbService {
     return this.getLocalList('custom_scenarios_all');
   }
 
-  async deleteCustomScenario(scenarioId) {
-    // ลบจาก Local Cache
+  /**
+   * ลบบทสนทนาใดๆ (ทั้งด่านเริ่มต้นและด่านใหม่)
+   */
+  async deleteScenario(scenarioId) {
+    // 1. ลบจาก Local Cache ของ custom_scenarios_all
     const local = this.getLocalList('custom_scenarios_all');
     const filtered = local.filter(s => s.id !== scenarioId);
     localStorage.setItem('custom_scenarios_all', JSON.stringify(filtered));
 
-    // ลบจาก Cloud Firestore
+    // 2. เพิ่มเข้า deleted_scenario_ids เพื่อซ่อนอย่างถาวร
+    const deletedList = this.getLocalList('deleted_scenario_ids');
+    if (!deletedList.includes(scenarioId)) {
+      deletedList.push(scenarioId);
+      localStorage.setItem('deleted_scenario_ids', JSON.stringify(deletedList));
+    }
+
+    // 3. ซิงค์ขึ้น Cloud Firestore
     if (isFirebaseConfigured()) {
       try {
         const fs = await this.getFirestore();
         if (fs) {
-          const { doc, deleteDoc } = fs.mods;
+          const { doc, deleteDoc, setDoc } = fs.mods;
+          // ลบจาก custom_scenarios (ถ้ามี)
           await deleteDoc(doc(fs.db, 'custom_scenarios', scenarioId));
+          // บันทึกรายการลบ
+          await setDoc(doc(fs.db, 'meta', 'deleted_scenarios'), { ids: deletedList }, { merge: true });
         }
       } catch (err) {
-        console.error('Firestore delete custom scenario error:', err);
+        console.error('Firestore delete scenario error:', err);
       }
     }
+  }
+
+  // Alias for backward compatibility
+  async deleteCustomScenario(scenarioId) {
+    return this.deleteScenario(scenarioId);
+  }
+
+  /**
+   * คืนค่าบทสนทนาเริ่มต้นทั้งหมด
+   */
+  async restoreDefaultScenarios() {
+    localStorage.removeItem('deleted_scenario_ids');
+    if (isFirebaseConfigured()) {
+      try {
+        const fs = await this.getFirestore();
+        if (fs) {
+          const { doc, setDoc } = fs.mods;
+          await setDoc(doc(fs.db, 'meta', 'deleted_scenarios'), { ids: [] });
+        }
+      } catch (e) {
+        console.warn('Firestore reset deleted error:', e);
+      }
+    }
+  }
+
+  async hasDeletedScenarios() {
+    const deleted = await this.getDeletedScenarioIds();
+    return deleted.length > 0;
   }
 
   // ===================== LOCAL STORAGE HELPERS =====================

@@ -148,9 +148,22 @@ export class UIController {
     const container = document.getElementById('scenarios-container');
     if (!container) return;
 
-    // Load custom scenarios from Firestore / Local cache
-    const customList = await dbService.getCustomScenarios();
-    this.allScenarios = [...customList, ...SCENARIOS];
+    // Load all active scenarios (built-ins + custom - deleted)
+    this.allScenarios = await dbService.getAllScenarios();
+
+    // Check if any default scenarios were deleted to toggle the restore button
+    const hasDeleted = await dbService.hasDeletedScenarios();
+    const restoreBtn = document.getElementById('btn-restore-defaults');
+    if (restoreBtn) {
+      restoreBtn.style.display = hasDeleted ? 'inline-flex' : 'none';
+      restoreBtn.onclick = async () => {
+        if (confirm('คุณต้องการคืนค่าบทสนทนาเริ่มต้นทั้งหมดหรือไม่?')) {
+          await dbService.restoreDefaultScenarios();
+          modalController.showToast('คืนค่าบทสนทนาเริ่มต้นทั้งหมดเรียบร้อยแล้ว 🌈', 'success');
+          this.renderScenarios();
+        }
+      };
+    }
 
     const filtered = this.allScenarios.filter(s => {
       let matchLevel = true;
@@ -176,8 +189,24 @@ export class UIController {
           <div style="font-size: 3rem; margin-bottom: 0.75rem;">🎨</div>
           <h3>ยังไม่มีบทสนทนาในหมวดนี้</h3>
           <p style="color: var(--text-muted); font-size: 0.95rem;">คุณครูหรือผู้ปกครองสามารถกดปุ่ม "สร้างบทสนทนาใหม่" ด้านบนเพื่อเพิ่มด่านได้เลยจ้า</p>
+          ${hasDeleted ? `
+            <div style="margin-top: 1.25rem;">
+              <button class="btn btn-secondary btn-sm" id="btn-empty-restore-defaults">
+                🔄 คืนค่าบทสนทนาเริ่มต้นทั้งหมด
+              </button>
+            </div>
+          ` : ''}
         </div>
       `;
+
+      const emptyRestoreBtn = document.getElementById('btn-empty-restore-defaults');
+      if (emptyRestoreBtn) {
+        emptyRestoreBtn.onclick = async () => {
+          await dbService.restoreDefaultScenarios();
+          modalController.showToast('คืนค่าบทสนทนาเริ่มต้นทั้งหมดเรียบร้อยแล้ว 🌈', 'success');
+          this.renderScenarios();
+        };
+      }
       return;
     }
 
@@ -201,15 +230,16 @@ export class UIController {
               <span class="scenario-partner-avatar">${s.partnerAvatar || '🐻'}</span>
               <span><strong>${this.escapeHtml(s.partnerName)}</strong> (${this.escapeHtml(s.partnerRole)})</span>
             </div>
-            <div style="display: flex; gap: 0.35rem;">
-              <button class="btn btn-primary btn-sm btn-start-scenario" data-id="${s.id}">
+            <div class="scenario-actions-group">
+              <button class="btn btn-primary btn-sm btn-start-scenario" data-id="${s.id}" title="เริ่มเล่นบทสนทนานี้">
                 เริ่มเล่น 🎙️
               </button>
-              ${s.isCustom ? `
-                <button class="btn btn-secondary btn-sm btn-del-custom" data-id="${s.id}" title="ลบด่านนี้" style="color: var(--danger); padding: 0.4rem 0.6rem;">
-                  🗑️
-                </button>
-              ` : ''}
+              <button class="btn btn-secondary btn-sm btn-edit-scenario" data-id="${s.id}" title="แก้ไขบทสนทนานี้">
+                ✏️ แก้ไข
+              </button>
+              <button class="btn btn-secondary btn-sm btn-del-scenario" data-id="${s.id}" title="ลบบทสนทนานี้">
+                🗑️
+              </button>
             </div>
           </div>
         </div>
@@ -219,20 +249,34 @@ export class UIController {
     // Attach click events
     container.querySelectorAll('.scenario-card').forEach(card => {
       card.addEventListener('click', (e) => {
-        if (e.target.closest('.btn-del-custom')) return;
+        if (e.target.closest('.btn-edit-scenario') || e.target.closest('.btn-del-scenario')) return;
         const id = card.getAttribute('data-id');
         this.startScenario(id);
       });
     });
 
-    // Delete custom scenario
-    container.querySelectorAll('.btn-del-custom').forEach(btn => {
+    // Edit scenario (both default and custom)
+    container.querySelectorAll('.btn-edit-scenario').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        const scenario = this.allScenarios.find(s => s.id === id);
+        if (scenario) {
+          modalController.openCustomScenarioModal(scenario);
+        }
+      });
+    });
+
+    // Delete scenario (both default and custom)
+    container.querySelectorAll('.btn-del-scenario').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const id = btn.getAttribute('data-id');
-        if (confirm('คุณต้องการลบด่านนี้ออกจากระบบหรือไม่?')) {
-          await dbService.deleteCustomScenario(id);
-          modalController.showToast('ลบด่านเรียบร้อยแล้ว', 'info');
+        const scenario = this.allScenarios.find(s => s.id === id);
+        const name = scenario ? scenario.title : 'บทสนทนานี้';
+        if (confirm(`คุณต้องการลบบทสนทนา "${name}" ออกจากระบบหรือไม่?`)) {
+          await dbService.deleteScenario(id);
+          modalController.showToast(`ลบบทสนทนา "${name}" เรียบร้อยแล้ว 🗑️`, 'info');
           this.renderScenarios();
         }
       });
@@ -387,6 +431,12 @@ export class UIController {
       // ตาผู้เรียนพูด: แสดง Teleprompter แนะนำคำพูด
       if (teleprompter) {
         teleprompter.style.display = 'flex';
+        teleprompter.classList.remove('shake-error');
+
+        // รีเซ็ต feedback ของข้อก่อนหน้า
+        const feedbackBox = document.getElementById('teleprompter-feedback');
+        if (feedbackBox) feedbackBox.style.display = 'none';
+
         document.getElementById('teleprompter-step-indicator').textContent = `ประโยคที่ ${this.currentScriptIndex + 1} / ${this.currentScript.length}`;
         document.getElementById('teleprompter-text').textContent = `"${currentLine.text}"`;
         document.getElementById('teleprompter-th').textContent = currentLine.textTh;
@@ -407,7 +457,15 @@ export class UIController {
 
         const btnSend = document.getElementById('btn-tele-send');
         if (btnSend) {
-          btnSend.onclick = () => this.submitUserScriptLine(currentLine.text);
+          btnSend.onclick = () => {
+            const textInput = document.getElementById('chat-input-text');
+            const val = textInput ? textInput.value.trim() : '';
+            if (!val) {
+              modalController.showToast('กรุณากดไมค์อ่านออกเสียง หรือพิมพ์ประโยคก่อนกดส่งตรวจครับ 🎙️', 'warning');
+              return;
+            }
+            this.submitUserScriptLine(val);
+          };
         }
       }
 
@@ -465,13 +523,136 @@ export class UIController {
     }
   }
 
-  async submitUserScriptLine(text) {
-    if (!this.activeScenario || this.isSubmittingScriptLine) return;
-    this.isSubmittingScriptLine = true;
+  /**
+   * ตรวจสอบความถูกต้องของเสียงพูดแบบ 100% (Strict Matching)
+   */
+  verifySpeechAccuracy(spokenText, expectedText) {
+    const NUM_MAP = {
+      '0': 'zero', '1': 'one', '2': 'two', '3': 'three', '4': 'four',
+      '5': 'five', '6': 'six', '7': 'seven', '8': 'eight', '9': 'nine', '10': 'ten'
+    };
 
-    speechService.stopListening();
+    const cleanWord = (w) => {
+      let cleaned = (w || '').toLowerCase().trim();
+      cleaned = cleaned.replace(/[^a-z0-9]/g, '');
+      return NUM_MAP[cleaned] || cleaned;
+    };
+
+    const tokenize = (text) => {
+      if (!text) return [];
+      let t = text.toLowerCase();
+      // จัดการคำที่มีการแปลงเสียงพูดบ่อยๆ
+      t = t.replace(/goodbye/gi, 'good bye');
+      t = t.replace(/['’]/g, ''); // Contractions: don't -> dont, I'm -> Im
+      const tokens = t.split(/\s+/)
+        .map(tok => cleanWord(tok))
+        .filter(tok => tok.length > 0);
+      return tokens;
+    };
+
+    const expectedTokens = tokenize(expectedText);
+    const spokenTokens = tokenize(spokenText);
+
+    if (spokenTokens.length === 0) {
+      return {
+        isMatch: false,
+        accuracy: 0,
+        spokenText,
+        expectedText,
+        expectedTokens,
+        spokenTokens,
+        diffDetails: expectedTokens.map(tok => ({ word: tok, matched: false }))
+      };
+    }
+
+    // ตรวจสอบความถูกต้องแบบ 100% คำต่อคำ
+    const isMatch = (expectedTokens.length === spokenTokens.length) &&
+      expectedTokens.every((tok, idx) => tok === spokenTokens[idx]);
+
+    // สร้างรายละเอียดคำศัพท์ที่พูดถูก vs พูดผิด/ขาดไป
+    const spokenSet = [...spokenTokens];
+    const diffDetails = expectedTokens.map(tok => {
+      const foundIdx = spokenSet.indexOf(tok);
+      if (foundIdx !== -1) {
+        spokenSet.splice(foundIdx, 1);
+        return { word: tok, matched: true };
+      }
+      return { word: tok, matched: false };
+    });
+
+    const matchedCount = diffDetails.filter(d => d.matched).length;
+    const accuracy = Math.round((matchedCount / Math.max(expectedTokens.length, 1)) * 100);
+
+    return {
+      isMatch,
+      accuracy,
+      spokenText,
+      expectedText,
+      expectedTokens,
+      spokenTokens,
+      diffDetails
+    };
+  }
+
+  async submitUserScriptLine(text) {
+    if (!this.activeScenario || !this.currentExpectedLine || this.isSubmittingScriptLine) return;
+
+    const currentLine = this.currentExpectedLine;
+    const check = this.verifySpeechAccuracy(text, currentLine.text);
+
+    const feedbackBox = document.getElementById('teleprompter-feedback');
+    const feedbackTitle = document.getElementById('teleprompter-feedback-title');
+    const feedbackDesc = document.getElementById('teleprompter-feedback-desc');
+    const wordDiffContainer = document.getElementById('teleprompter-word-diff');
     const teleprompter = document.getElementById('guided-teleprompter');
-    if (teleprompter) teleprompter.style.display = 'none';
+    const statusText = document.getElementById('speech-status-indicator');
+
+    // ❌ หากพูดไม่ถูกต้อง 100% บล็อกไม่ให้ไปต่อเด็ดขาด ต้องให้พูดใหม่!
+    if (!check.isMatch) {
+      this.isSubmittingScriptLine = false;
+
+      // แสดง Animation สั่นเตือน
+      if (teleprompter) {
+        teleprompter.classList.remove('shake-error');
+        void teleprompter.offsetWidth; // trigger reflow
+        teleprompter.classList.add('shake-error');
+      }
+
+      // แสดงกล่อง Feedback รายละเอียดคำพูด
+      if (feedbackBox) {
+        feedbackBox.style.display = 'flex';
+        if (feedbackTitle) {
+          feedbackTitle.innerHTML = `<span>❌ ยังออกเสียงไม่ถูกต้องนะจ๊ะ (ได้ยินว่า: "<em>${this.escapeHtml(text || 'ยังไม่ได้ยินเสียง')}</em>")</span>`;
+        }
+        if (feedbackDesc) {
+          feedbackDesc.innerHTML = `หนูต้องพูดให้ตรงกับประโยคเป้าหมาย 100% (ตรวจความถูกต้องได้ <strong>${check.accuracy}%</strong>) 👉 ลองฟังเสียงตัวอย่าง 🔊 แล้วกดไมค์พูดใหม่นะจ๊ะ!`;
+        }
+        if (wordDiffContainer) {
+          wordDiffContainer.innerHTML = check.diffDetails.map(d => `
+            <span class="word-chip ${d.matched ? 'word-correct' : 'word-missing'}" title="${d.matched ? 'พูดถูกต้องแล้ว' : 'ยังไม่ได้ยินคำนี้'}">
+              ${d.matched ? '✓' : '✗'} ${this.escapeHtml(d.word)}
+            </span>
+          `).join('');
+        }
+      }
+
+      if (statusText) {
+        statusText.textContent = `❌ ยังไม่ถูกต้อง (${check.accuracy}%) แตะไมค์เพื่อพูดใหม่ 🎙️`;
+      }
+
+      modalController.showToast('❌ ยังออกเสียงไม่ถูกต้อง 100% นะครับ ลองฟังเสียงตัวอย่างแล้วพูดใหม่นะจ๊ะ! 🎙️', 'warning', 3500);
+      return;
+    }
+
+    // ✅ เมื่อพูดถูกต้อง 100% ครบถ้วน
+    this.isSubmittingScriptLine = true;
+    speechService.stopListening();
+
+    if (feedbackBox) feedbackBox.style.display = 'none';
+    if (teleprompter) {
+      teleprompter.classList.remove('shake-error');
+      teleprompter.style.display = 'none';
+    }
 
     // ใส่ Bubble ของผู้เรียน
     const userMsg = {
@@ -479,13 +660,13 @@ export class UIController {
       sender: 'user',
       speaker: this.userRole,
       avatar: this.userAvatar || '👦',
-      text: text,
+      text: currentLine.text,
       timestamp: new Date()
     };
     this.messageHistory.push(userMsg);
     this.appendMessageBubble(userMsg);
 
-    modalController.showToast('🎉 เยี่ยมมาก! ออกเสียงประโยคสำเร็จ', 'success', 2000);
+    modalController.showToast('🎉 เก่งมากคนเก่ง! ออกเสียงถูกต้อง 100% ยอดเยี่ยมมาก!', 'success', 2500);
 
     // เลื่อนบรรทัดสคริปต์
     this.currentScriptIndex++;
@@ -759,9 +940,6 @@ export class UIController {
   async sendUserMessage(text) {
     if (!text || !this.activeScenario) return;
 
-    // Clear input & stop mic if on
-    const textInput = document.getElementById('chat-input-text');
-    if (textInput) textInput.value = '';
     speechService.stopListening();
 
     // กรณีอยู่ในโหมดบทสนทนาแบบ Script
@@ -769,6 +947,10 @@ export class UIController {
       await this.submitUserScriptLine(text);
       return;
     }
+
+    // Clear input for free chat mode
+    const textInput = document.getElementById('chat-input-text');
+    if (textInput) textInput.value = '';
 
     // 1. Append User Message
     const userMsg = {

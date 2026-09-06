@@ -220,10 +220,10 @@ export class ModalController {
 
   // ===================== CUSTOM SCENARIO BUILDER MODAL =====================
 
-  openCustomScenarioModal() {
-    // บังคับให้ Login ด้วย Google Account ก่อนสร้างบทสนทนาใหม่
+  openCustomScenarioModal(scenarioToEdit = null) {
+    // บังคับให้ Login ด้วย Google Account ก่อนสร้าง/แก้ไขบทสนทนา
     if (!authService.isLoggedInWithGoogle()) {
-      this.showToast('⚠️ กรุณาเข้าสู่ระบบด้วย Google Account ก่อนสร้างบทสนทนาใหม่ เพื่อบันทึกและซิงค์ข้อมูลของคุณขึ้น Cloud', 'warning', 4500);
+      this.showToast('⚠️ กรุณาเข้าสู่ระบบด้วย Google Account ก่อนจัดการบทสนทนา เพื่อบันทึกและซิงค์ข้อมูลของคุณขึ้น Cloud', 'warning', 4500);
       this.openProfileModal();
       return;
     }
@@ -231,45 +231,99 @@ export class ModalController {
     const modal = document.getElementById('custom-scenario-modal');
     if (!modal) return;
 
-    // Reset Form fields
+    this.editingScenarioId = scenarioToEdit ? scenarioToEdit.id : null;
+
+    // Update Modal Title and Save Button Text
+    const headerTitle = modal.querySelector('.modal-header h3');
+    const saveBtn = document.getElementById('btn-save-custom-scenario');
+    if (headerTitle) {
+      headerTitle.textContent = scenarioToEdit ? '✏️ แก้ไขบทสนทนา (Edit Scenario)' : '🎨 สร้างบทสนทนาใหม่ (Custom Scenario Builder)';
+    }
+    if (saveBtn) {
+      saveBtn.textContent = scenarioToEdit ? '💾 บันทึกการแก้ไขบทสนทนา' : '💾 บันทึกบทสนทนาขึ้น Cloud';
+    }
+
+    // Populate Form fields
     const setVal = (id, val) => {
       const el = document.getElementById(id);
       if (el) el.value = val;
     };
-    setVal('custom-title', '');
-    setVal('custom-title-th', '');
-    setVal('custom-description', '');
+    setVal('custom-title', scenarioToEdit ? (scenarioToEdit.title || '') : '');
+    setVal('custom-title-th', scenarioToEdit ? (scenarioToEdit.titleTh || '') : '');
+    setVal('custom-description', scenarioToEdit ? (scenarioToEdit.description || '') : '');
+    setVal('custom-level', scenarioToEdit ? (scenarioToEdit.level || 'ประถม 1 - 3') : 'ประถม 1 - 3');
     setVal('custom-new-char-input', '');
 
-    // Reset Emoji Picker
+    // Reset / Select Emoji Picker
+    const targetEmoji = scenarioToEdit ? (scenarioToEdit.icon || '🐻') : '🐻';
     const pills = document.querySelectorAll('#custom-emoji-picker .emoji-pill');
-    pills.forEach((p, idx) => {
-      p.classList.toggle('selected', idx === 0);
+    let emojiMatched = false;
+    pills.forEach((p) => {
+      const emoji = p.getAttribute('data-emoji');
+      const isMatch = emoji === targetEmoji;
+      if (isMatch) emojiMatched = true;
+      p.classList.toggle('selected', isMatch);
       p.onclick = () => {
         pills.forEach(el => el.classList.remove('selected'));
         p.classList.add('selected');
       };
     });
+    if (!emojiMatched && pills.length > 0) {
+      pills[0].classList.add('selected');
+    }
 
-    // Initialize Default Characters (รองรับมากกว่า 2 ตัวละคร)
-    this.scenarioCharacters = ['Shopkeeper', 'Customer'];
+    // Initialize Characters
+    if (scenarioToEdit && scenarioToEdit.characters && scenarioToEdit.characters.length >= 2) {
+      this.scenarioCharacters = [...scenarioToEdit.characters];
+    } else if (scenarioToEdit && scenarioToEdit.script && scenarioToEdit.script.length > 0) {
+      const speakers = [...new Set(scenarioToEdit.script.map(s => s.speaker))];
+      this.scenarioCharacters = speakers.length >= 2 ? speakers : [...speakers, 'Customer'];
+    } else if (scenarioToEdit) {
+      this.scenarioCharacters = [scenarioToEdit.partnerName || 'Shopkeeper', 'Customer'];
+    } else {
+      this.scenarioCharacters = ['Shopkeeper', 'Customer'];
+    }
     this.renderCharactersList();
 
-    // Initialize Default Lines
-    this.dialogueLines = [
-      {
-        id: 'line_' + Date.now() + '_1',
-        speaker: 'Shopkeeper',
-        text: 'Hello! How are you today?',
-        textTh: 'สวัสดีครับ! วันนี้เป็นอย่างไรบ้างครับ?'
-      },
-      {
-        id: 'line_' + Date.now() + '_2',
-        speaker: 'Customer',
-        text: 'I am doing great, thank you!',
-        textTh: 'สบายดีมาก ขอบคุณครับ!'
-      }
-    ];
+    // Initialize Dialogue Lines
+    if (scenarioToEdit && scenarioToEdit.script && scenarioToEdit.script.length > 0) {
+      this.dialogueLines = scenarioToEdit.script.map((s, idx) => ({
+        id: 'line_' + Date.now() + '_' + idx,
+        speaker: s.speaker,
+        text: s.text,
+        textTh: s.textTh || ''
+      }));
+    } else if (scenarioToEdit) {
+      this.dialogueLines = [
+        {
+          id: 'line_' + Date.now() + '_1',
+          speaker: this.scenarioCharacters[0],
+          text: scenarioToEdit.initialMessage || 'Good afternoon! Can I help you?',
+          textTh: scenarioToEdit.initialMessageTh || 'สวัสดีครับ! มีอะไรให้ผมช่วยไหมครับ?'
+        },
+        {
+          id: 'line_' + Date.now() + '_2',
+          speaker: this.scenarioCharacters[1] || 'Customer',
+          text: scenarioToEdit.suggestedPrompts?.[0] || 'Yes, I want to buy a carton of milk.',
+          textTh: 'ครับ ผมอยากซื้อนมหนึ่งกล่องครับ'
+        }
+      ];
+    } else {
+      this.dialogueLines = [
+        {
+          id: 'line_' + Date.now() + '_1',
+          speaker: 'Shopkeeper',
+          text: 'Hello! How are you today?',
+          textTh: 'สวัสดีครับ! วันนี้เป็นอย่างไรบ้างครับ?'
+        },
+        {
+          id: 'line_' + Date.now() + '_2',
+          speaker: 'Customer',
+          text: 'I am doing great, thank you!',
+          textTh: 'สบายดีมาก ขอบคุณครับ!'
+        }
+      ];
+    }
     this.renderDialogueLines();
 
     // Hook sub-actions
@@ -279,6 +333,7 @@ export class ModalController {
   }
 
   closeCustomScenarioModal() {
+    this.editingScenarioId = null;
     const modal = document.getElementById('custom-scenario-modal');
     if (modal) modal.classList.remove('active');
   }
@@ -669,10 +724,15 @@ export class ModalController {
       vocabularyList: []
     };
 
+    if (this.editingScenarioId) {
+      scenarioData.id = this.editingScenarioId;
+    }
+
     try {
       const { dbService } = await import('../services/db-service.js');
-      await dbService.saveCustomScenario(scenarioData);
-      this.showToast('🎉 บันทึกบทสนทนาใหม่ขึ้น Cloud สำเร็จแล้ว! พร้อมให้ฝึกพูดทันที', 'success');
+      await dbService.saveScenario(scenarioData);
+      this.showToast(this.editingScenarioId ? '🎉 บันทึกการแก้ไขบทสนทนาเรียบร้อยแล้ว!' : '🎉 บันทึกบทสนทนาใหม่ขึ้น Cloud สำเร็จแล้ว! พร้อมให้ฝึกพูดทันที', 'success');
+      this.editingScenarioId = null;
       this.closeCustomScenarioModal();
       if (onSuccess) onSuccess();
       return true;

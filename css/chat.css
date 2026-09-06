@@ -559,6 +559,78 @@
   transform: scale(1.05);
 }
 
+/* Shake animation when speech is incorrect */
+@keyframes shakeError {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+
+.teleprompter-box.shake-error {
+  animation: shakeError 0.45s ease;
+  border-color: #ef4444 !important;
+  background: linear-gradient(135deg, #fef2f2, #fff1f2) !important;
+}
+
+/* Feedback alert inside Teleprompter */
+.teleprompter-feedback {
+  background: #ffffff;
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.85rem;
+  border: 1.5px solid #fca5a5;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  box-shadow: var(--shadow-sm);
+  animation: fadeIn 0.25s ease;
+}
+
+.teleprompter-feedback.error {
+  background: #fff5f5;
+  border-color: #f87171;
+  color: #991b1b;
+}
+
+.teleprompter-feedback-title {
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.teleprompter-word-diff {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.25rem;
+  padding: 0.4rem;
+  background: #ffffff;
+  border-radius: var(--radius-sm);
+  border: 1px solid #fed7aa;
+}
+
+.word-chip {
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+}
+
+.word-chip.word-correct {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+.word-chip.word-missing {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1.5px dashed #f87171;
+}
+
 /* ==================== ROLE SELECTION MODAL ==================== */
 .role-selection-grid {
   display: grid;
