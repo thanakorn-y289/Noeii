@@ -313,8 +313,11 @@ export class UIController {
 
     // ถ้าเป็นบทสนทนาที่มี Script ลำดับบทพูด ให้เปิดหน้าต่างเลือกบทบาทก่อน
     if (scenario.script && scenario.script.length > 0) {
-      modalController.openRoleSelectionModal(scenario, (selectedRole) => {
-        this.startScriptedScenario(scenario, selectedRole);
+      modalController.openRoleSelectionModal(scenario, (options) => {
+        const userRole = typeof options === 'string' ? options : (options?.role || 'Customer');
+        const accuracyThreshold = typeof options === 'object' && options?.accuracyThreshold ? options.accuracyThreshold : 100;
+        const hidePromptText = typeof options === 'object' && options?.hidePromptText !== undefined ? options.hidePromptText : false;
+        this.startScriptedScenario(scenario, userRole, { accuracyThreshold, hidePromptText });
       });
       return;
     }
@@ -323,13 +326,17 @@ export class UIController {
     this.startFreeScenario(scenario);
   }
 
-  startScriptedScenario(scenario, userRole = 'Customer') {
+  startScriptedScenario(scenario, userRole = 'Customer', preferences = {}) {
     this.activeScenario = scenario;
     this.userRole = userRole;
     this.currentScript = scenario.script || [];
     this.currentScriptIndex = 0;
     this.messageHistory = [];
     this.sessionStartTime = new Date();
+
+    // Accuracy Threshold (50% - 100%) and Prompt Visibility preferences
+    this.accuracyThreshold = preferences.accuracyThreshold || 100;
+    this.hidePromptText = Boolean(preferences.hidePromptText);
 
     const myFirstLine = this.currentScript.find(s => s.speaker === userRole);
     this.userAvatar = myFirstLine?.avatar || '👦';
@@ -438,8 +445,67 @@ export class UIController {
         if (feedbackBox) feedbackBox.style.display = 'none';
 
         document.getElementById('teleprompter-step-indicator').textContent = `ประโยคที่ ${this.currentScriptIndex + 1} / ${this.currentScript.length}`;
-        document.getElementById('teleprompter-text').textContent = `"${currentLine.text}"`;
         document.getElementById('teleprompter-th').textContent = currentLine.textTh;
+
+        // Teleprompter Target Accuracy Badge (ปรับ % ได้แบบ on-the-fly)
+        const targetBadge = document.getElementById('teleprompter-target-badge');
+        if (targetBadge) {
+          targetBadge.textContent = `🎯 เกณฑ์: ${this.accuracyThreshold || 100}%`;
+          targetBadge.onclick = () => {
+            const input = prompt('ปรับเกณฑ์ % ความถูกต้องของเสียงพูด (50 - 100%):', this.accuracyThreshold || 100);
+            if (input !== null) {
+              const val = parseInt(input, 10);
+              if (!isNaN(val) && val >= 50 && val <= 100) {
+                this.accuracyThreshold = val;
+                targetBadge.textContent = `🎯 เกณฑ์: ${this.accuracyThreshold}%`;
+                modalController.showToast(`ปรับเกณฑ์ความถูกต้องเป็น ${this.accuracyThreshold}% แล้ว 🎯`, 'info', 2500);
+              } else {
+                modalController.showToast('กรุณาระบุตัวเลขระหว่าง 50 ถึง 100 ครับ', 'warning', 3000);
+              }
+            }
+          };
+        }
+
+        // Toggle Hide/Show Prompt Text
+        const teleTextEl = document.getElementById('teleprompter-text');
+        const btnToggleView = document.getElementById('btn-tele-toggle-view');
+        const toggleIcon = document.getElementById('btn-tele-toggle-icon');
+        const toggleText = document.getElementById('btn-tele-toggle-text');
+
+        const updateVisibility = () => {
+          if (!teleTextEl) return;
+          if (this.hidePromptText) {
+            teleTextEl.classList.add('prompt-hidden');
+            teleTextEl.innerHTML = `<span class="prompt-hidden-overlay">🙈 ซ่อนประโยคไว้เพื่อฝึกจำ (แตะเพื่อดูเฉลย)</span>`;
+            if (toggleIcon) toggleIcon.textContent = '👁️';
+            if (toggleText) toggleText.textContent = 'แสดงประโยค';
+            if (btnToggleView) btnToggleView.title = 'เปิดดูตัวอย่างประโยค';
+          } else {
+            teleTextEl.classList.remove('prompt-hidden');
+            teleTextEl.textContent = `"${currentLine.text}"`;
+            if (toggleIcon) toggleIcon.textContent = '🙈';
+            if (toggleText) toggleText.textContent = 'ซ่อนประโยค';
+            if (btnToggleView) btnToggleView.title = 'ซ่อนประโยคเพื่อฝึกจำ';
+          }
+        };
+
+        updateVisibility();
+
+        if (btnToggleView) {
+          btnToggleView.onclick = () => {
+            this.hidePromptText = !this.hidePromptText;
+            updateVisibility();
+          };
+        }
+
+        if (teleTextEl) {
+          teleTextEl.onclick = () => {
+            if (this.hidePromptText) {
+              this.hidePromptText = false;
+              updateVisibility();
+            }
+          };
+        }
 
         const btnListen = document.getElementById('btn-tele-listen');
         if (btnListen) {
@@ -473,7 +539,9 @@ export class UIController {
 
       const textInput = document.getElementById('chat-input-text');
       if (textInput) {
-        textInput.placeholder = `กดไมค์พูดว่า: "${currentLine.text}"`;
+        textInput.placeholder = this.hidePromptText 
+          ? '🙈 ซ่อนประโยคไว้ ลองนึกคำพูดแล้วกดไมค์พูดดูเลย!' 
+          : `กดไมค์พูดว่า: "${currentLine.text}"`;
         textInput.value = '';
       }
 
@@ -599,6 +667,8 @@ export class UIController {
 
     const currentLine = this.currentExpectedLine;
     const check = this.verifySpeechAccuracy(text, currentLine.text);
+    const targetThreshold = this.accuracyThreshold || 100;
+    const isPassed = targetThreshold === 100 ? check.isMatch : (check.accuracy >= targetThreshold);
 
     const feedbackBox = document.getElementById('teleprompter-feedback');
     const feedbackTitle = document.getElementById('teleprompter-feedback-title');
@@ -607,8 +677,8 @@ export class UIController {
     const teleprompter = document.getElementById('guided-teleprompter');
     const statusText = document.getElementById('speech-status-indicator');
 
-    // ❌ หากพูดไม่ถูกต้อง 100% บล็อกไม่ให้ไปต่อเด็ดขาด ต้องให้พูดใหม่!
-    if (!check.isMatch) {
+    // ❌ หากคะแนนความถูกต้องยังไม่ถึงเกณฑ์ บล็อกไม่ให้ไปต่อ ต้องให้พูดใหม่!
+    if (!isPassed) {
       this.isSubmittingScriptLine = false;
 
       // แสดง Animation สั่นเตือน
@@ -622,10 +692,10 @@ export class UIController {
       if (feedbackBox) {
         feedbackBox.style.display = 'flex';
         if (feedbackTitle) {
-          feedbackTitle.innerHTML = `<span>❌ ยังออกเสียงไม่ถูกต้องนะจ๊ะ (ได้ยินว่า: "<em>${this.escapeHtml(text || 'ยังไม่ได้ยินเสียง')}</em>")</span>`;
+          feedbackTitle.innerHTML = `<span>❌ ความถูกต้องยังไม่ถึงเกณฑ์นะจ๊ะ (ได้ยินว่า: "<em>${this.escapeHtml(text || 'ยังไม่ได้ยินเสียง')}</em>")</span>`;
         }
         if (feedbackDesc) {
-          feedbackDesc.innerHTML = `หนูต้องพูดให้ตรงกับประโยคเป้าหมาย 100% (ตรวจความถูกต้องได้ <strong>${check.accuracy}%</strong>) 👉 ลองฟังเสียงตัวอย่าง 🔊 แล้วกดไมค์พูดใหม่นะจ๊ะ!`;
+          feedbackDesc.innerHTML = `ความถูกต้องอยู่ที่ <strong>${check.accuracy}%</strong> (เกณฑ์ผ่านกำหนดไว้ <strong>${targetThreshold}%</strong>) 👉 ลองฟังเสียงตัวอย่าง 🔊 แล้วกดไมค์พูดใหม่นะจ๊ะ!`;
         }
         if (wordDiffContainer) {
           wordDiffContainer.innerHTML = check.diffDetails.map(d => `
@@ -637,14 +707,14 @@ export class UIController {
       }
 
       if (statusText) {
-        statusText.textContent = `❌ ยังไม่ถูกต้อง (${check.accuracy}%) แตะไมค์เพื่อพูดใหม่ 🎙️`;
+        statusText.textContent = `❌ ทำได้ ${check.accuracy}% (เกณฑ์ ${targetThreshold}%) แตะไมค์เพื่อพูดใหม่ 🎙️`;
       }
 
-      modalController.showToast('❌ ยังออกเสียงไม่ถูกต้อง 100% นะครับ ลองฟังเสียงตัวอย่างแล้วพูดใหม่นะจ๊ะ! 🎙️', 'warning', 3500);
+      modalController.showToast(`❌ ความถูกต้องยังไม่ถึงเกณฑ์ (ทำได้ ${check.accuracy}% / เกณฑ์ ${targetThreshold}%) ลองพูดใหม่อีกครั้งนะจ๊ะ! 🎙️`, 'warning', 3500);
       return;
     }
 
-    // ✅ เมื่อพูดถูกต้อง 100% ครบถ้วน
+    // ✅ เมื่อพูดผ่านเกณฑ์ความถูกต้องที่กำหนด
     this.isSubmittingScriptLine = true;
     speechService.stopListening();
 
@@ -666,7 +736,10 @@ export class UIController {
     this.messageHistory.push(userMsg);
     this.appendMessageBubble(userMsg);
 
-    modalController.showToast('🎉 เก่งมากคนเก่ง! ออกเสียงถูกต้อง 100% ยอดเยี่ยมมาก!', 'success', 2500);
+    const toastMsg = targetThreshold === 100 
+      ? '🎉 เก่งมากคนเก่ง! ออกเสียงถูกต้อง 100% ครบถ้วน!' 
+      : `🎉 ผ่านเกณฑ์แล้ว! ความถูกต้อง ${check.accuracy}% (เกณฑ์ ${targetThreshold}%) ยอดเยี่ยมมาก!`;
+    modalController.showToast(toastMsg, 'success', 2500);
 
     // เลื่อนบรรทัดสคริปต์
     this.currentScriptIndex++;

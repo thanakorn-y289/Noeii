@@ -136,7 +136,15 @@
         <div class="teleprompter-box" id="guided-teleprompter" style="display: none;">
           <div class="teleprompter-header">
             <span class="teleprompter-badge">📖 ประโยคที่หนูต้องพูด (Your Turn to Speak)</span>
-            <span class="teleprompter-step" id="teleprompter-step-indicator">ประโยคที่ 1 / 8</span>
+            <div class="teleprompter-header-controls">
+              <button type="button" class="btn-tele-toggle-view" id="btn-tele-toggle-view" title="เปิด/ปิดการแสดงตัวอย่างประโยค">
+                <span id="btn-tele-toggle-icon">👁️</span> <span id="btn-tele-toggle-text">แสดงประโยค</span>
+              </button>
+              <button type="button" class="teleprompter-target-badge" id="teleprompter-target-badge" title="เกณฑ์ความถูกต้องที่กำหนดไว้ (คลิกเพื่อปรับเปลี่ยน)">
+                🎯 ผ่านที่ 100%
+              </button>
+              <span class="teleprompter-step" id="teleprompter-step-indicator">ประโยคที่ 1 / 8</span>
+            </div>
           </div>
           <div class="teleprompter-text" id="teleprompter-text">
             "Good afternoon! Can I help you?"
@@ -226,6 +234,35 @@
         </p>
         <div class="role-selection-grid" id="role-selection-grid">
           <!-- Dynamically rendered by modalController.openRoleSelectionModal -->
+        </div>
+
+        <!-- Scenario Practice Preferences (กำหนด % ความถูกต้อง & ซ่อนประโยค) -->
+        <div class="practice-settings-panel">
+          <div class="practice-setting-item">
+            <div class="setting-item-header">
+              <span class="setting-title">🎯 เกณฑ์ความถูกต้องของเสียงพูด:</span>
+              <span class="setting-badge-val" id="modal-accuracy-val">100%</span>
+            </div>
+            <div class="slider-row">
+              <span class="slider-boundary-label">50%</span>
+              <input type="range" id="modal-accuracy-threshold" min="50" max="100" step="5" value="100" class="threshold-range-slider">
+              <span class="slider-boundary-label">100%</span>
+            </div>
+            <p class="setting-subtext">เลือกว่าต้องออกเสียงตรงกี่เปอร์เซ็นต์ถึงจะผ่านไปยังบทสนทนาถัดไปได้ (50% - 100%)</p>
+          </div>
+
+          <div class="practice-setting-item toggle-item">
+            <div class="setting-toggle-header">
+              <div class="setting-toggle-text">
+                <span class="setting-title">🙈 ซ่อนตัวอย่างประโยค (ฝึกพูดโดยไม่ต้องดู)</span>
+                <p class="setting-subtext">ปิดบังประโยคภาษาอังกฤษเพื่อฝึกจำและพูดเอง (เปิดดูเฉลยได้ตลอดเวลา)</p>
+              </div>
+              <label class="switch-control">
+                <input type="checkbox" id="modal-hide-prompt-toggle">
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
     </div>

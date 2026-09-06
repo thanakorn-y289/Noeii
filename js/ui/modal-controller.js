@@ -766,6 +766,19 @@ export class ModalController {
       characters = [scenario.partnerName || 'Character 1', 'Student'];
     }
 
+    // Wire Preferences (Threshold slider & Hide prompt toggle)
+    const thresholdInput = document.getElementById('modal-accuracy-threshold');
+    const thresholdVal = document.getElementById('modal-accuracy-val');
+    const hidePromptToggle = document.getElementById('modal-hide-prompt-toggle');
+
+    if (thresholdInput && thresholdVal) {
+      thresholdInput.value = thresholdInput.value || '100';
+      thresholdVal.textContent = thresholdInput.value + '%';
+      thresholdInput.oninput = (e) => {
+        thresholdVal.textContent = e.target.value + '%';
+      };
+    }
+
     if (grid) {
       grid.innerHTML = characters.map((charName, index) => {
         // Find avatar and thai title from first line matching this speaker
@@ -792,8 +805,17 @@ export class ModalController {
       grid.querySelectorAll('.role-card-select').forEach(card => {
         card.onclick = () => {
           const role = card.getAttribute('data-role');
+          const accuracyThreshold = thresholdInput ? parseInt(thresholdInput.value, 10) : 100;
+          const hidePromptText = hidePromptToggle ? hidePromptToggle.checked : false;
+
           this.closeRoleSelectionModal();
-          if (onRoleSelected) onRoleSelected(role);
+          if (onRoleSelected) {
+            onRoleSelected({
+              role,
+              accuracyThreshold,
+              hidePromptText
+            });
+          }
         };
       });
     }

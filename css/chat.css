@@ -476,6 +476,54 @@
   letter-spacing: 0.02em;
 }
 
+.teleprompter-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.btn-tele-toggle-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-full);
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-tele-toggle-view:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+  border-color: #94a3b8;
+}
+
+.teleprompter-target-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #1d4ed8;
+  background: #dbeafe;
+  border: 1px solid #bfdbfe;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.teleprompter-target-badge:hover {
+  background: #bfdbfe;
+  transform: scale(1.03);
+}
+
 .teleprompter-step {
   font-size: clamp(0.72rem, 1.8vw, 0.8rem);
   font-weight: 700;
@@ -495,6 +543,31 @@
   border-radius: var(--radius-sm);
   border: 2px dashed #f59e0b;
   word-break: break-word;
+  transition: var(--transition);
+}
+
+.teleprompter-text.prompt-hidden {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #94a3b8;
+  cursor: pointer;
+  text-align: center;
+  padding: 0.85rem 1rem;
+}
+
+.teleprompter-text.prompt-hidden:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.prompt-hidden-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  color: #64748b;
+  font-size: 0.95rem;
+  font-weight: 800;
 }
 
 .teleprompter-th {
@@ -686,6 +759,133 @@
   color: var(--text-muted);
   font-weight: 600;
   line-height: 1.4;
+}
+
+/* ==================== PRACTICE SETTINGS PANEL IN ROLE MODAL ==================== */
+.practice-settings-panel {
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: var(--radius-md);
+  padding: 1rem 1.15rem;
+  margin-top: 1.25rem;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.practice-setting-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.setting-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.setting-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.setting-badge-val {
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-weight: 900;
+  font-size: 0.85rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-full);
+  border: 1px solid #bfdbfe;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.25rem 0;
+}
+
+.slider-boundary-label {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #64748b;
+}
+
+.threshold-range-slider {
+  flex: 1;
+  height: 8px;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
+.setting-subtext {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.35;
+}
+
+.setting-toggle-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.setting-toggle-text {
+  flex: 1;
+}
+
+/* Switch Control */
+.switch-control {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.switch-control input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #cbd5e1;
+  transition: .3s;
+  border-radius: 34px;
+}
+
+.switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.switch-control input:checked + .switch-slider {
+  background-color: #2563eb;
+}
+
+.switch-control input:checked + .switch-slider:before {
+  transform: translateX(22px);
 }
 
 /* ==================== CHAT RESPONSIVE RULES ==================== */
