@@ -314,7 +314,9 @@ class DbService {
       ...data,
       id,
       isCustom: true,
-      createdBy: user?.displayName || 'Teacher/Parent',
+      userId: user?.uid || null,
+      userEmail: user?.email || null,
+      createdBy: user?.displayName || user?.email || 'Teacher/Parent',
       createdAt: new Date().toISOString()
     };
 

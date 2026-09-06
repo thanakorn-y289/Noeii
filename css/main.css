@@ -45,16 +45,6 @@
   --transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-[data-theme="dark"] {
-  --bg-main: #0f172a;
-  --bg-card: rgba(30, 41, 59, 0.88);
-  --bg-card-hover: rgba(30, 41, 59, 0.98);
-  --border-color: rgba(51, 65, 85, 0.8);
-  --text-main: #f8fafc;
-  --text-muted: #cbd5e1;
-  --text-subtle: #94a3b8;
-  --primary-light: rgba(59, 130, 246, 0.2);
-}
 
 * {
   box-sizing: border-box;
@@ -213,10 +203,6 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
-[data-theme="dark"] .nav-tab.active {
-  background: #1e293b;
-  color: #60a5fa;
-}
 
 /* User Profile Badge */
 .user-badge {

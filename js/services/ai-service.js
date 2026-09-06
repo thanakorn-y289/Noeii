@@ -23,6 +23,47 @@ class AIService {
   }
 
   /**
+   * แปลประโยคภาษาอังกฤษเป็นภาษาไทยสำหรับบทสนทนาเด็กประถม
+   */
+  async translateToThai(englishText) {
+    if (!englishText || !englishText.trim()) return "";
+    const cleanText = englishText.trim();
+
+    // 1. ลองใช้ Gemini API หากมี Key
+    if (this.geminiApiKey) {
+      try {
+        const prompt = `Translate this English sentence to natural, polite Thai suitable for a primary school student dialogue (keep it friendly, e.g. ครับ/ค่ะ). Output ONLY the Thai translation text, nothing else:\n"${cleanText}"`;
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.geminiApiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+        const data = await res.json();
+        const translated = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (translated) {
+          return translated.trim().replace(/^"|"$/g, '');
+        }
+      } catch (e) {
+        console.warn('Gemini translate error, falling back to public translation:', e);
+      }
+    }
+
+    // 2. ใช้งาน MyMemory Translation API (ฟรี รวดเร็ว แม่นยำ)
+    try {
+      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(cleanText)}&langpair=en|th`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data?.responseData?.translatedText) {
+        return data.responseData.translatedText.trim();
+      }
+    } catch (e) {
+      console.warn('MyMemory translate error:', e);
+    }
+
+    return "";
+  }
+
+  /**
    * ส่งข้อความของผู้ใช้และรับคำตอบของคู่สนทนา พร้อมคำแนะนำไวยากรณ์และการแปล
    */
   async generateReply(scenario, messageHistory, userMessage) {

@@ -175,6 +175,13 @@ class AuthService {
     return this.currentUser;
   }
 
+  /**
+   * ตรวจสอบว่าล็อกอินด้วย Google Account หรือไม่
+   */
+  isLoggedInWithGoogle() {
+    return Boolean(this.currentUser && !this.currentUser.isGuest && this.currentUser.uid);
+  }
+
   notifyListeners(user) {
     this.authStateListeners.forEach(listener => {
       try {

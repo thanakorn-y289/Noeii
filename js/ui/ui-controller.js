@@ -74,11 +74,6 @@ export class UIController {
     // View specific hooks
     if (viewName === 'scenarios') {
       this.renderScenarios();
-      this.updateStatsBanner();
-    } else if (viewName === 'wordbank') {
-      this.renderWordBank();
-    } else if (viewName === 'history') {
-      this.renderHistory();
     }
   }
 
@@ -92,6 +87,12 @@ export class UIController {
 
     // Firebase indicator click
     document.getElementById('firebase-indicator')?.addEventListener('click', () => {
+      modalController.openFirebaseModal();
+    });
+
+    // Firebase config button in Settings
+    document.getElementById('btn-open-firebase-config')?.addEventListener('click', () => {
+      modalController.closeSettingsModal();
       modalController.openFirebaseModal();
     });
 
@@ -125,14 +126,14 @@ export class UIController {
       const user = authService.getCurrentUser();
       if (user && !user.isGuest) {
         badge.className = 'firebase-indicator';
-        textEl.textContent = 'Firebase Synced';
+        textEl.textContent = 'Firebase Synced (เชื่อมต่อแล้ว)';
       } else {
         badge.className = 'firebase-indicator warning';
-        textEl.textContent = 'Firebase Connected (Click to Login)';
+        textEl.textContent = 'Firebase Ready (กด Login Google)';
       }
     } else {
       badge.className = 'firebase-indicator warning';
-      textEl.textContent = 'Setup Firebase';
+      textEl.textContent = 'ยังไม่ได้ตั้งค่า Firebase';
     }
   }
 
@@ -255,22 +256,6 @@ export class UIController {
     }
   }
 
-  async updateStatsBanner() {
-    const stats = await dbService.getUserStats();
-    const streakEl = document.getElementById('stat-streak');
-    const countEl = document.getElementById('stat-practices');
-    const starsBanner = document.getElementById('stat-stars-banner');
-    const starsHeader = document.getElementById('header-stars-count');
-
-    const stars = stats.starsCount || 0;
-    if (starsBanner) starsBanner.textContent = `${stars} ⭐`;
-    if (starsHeader) starsHeader.textContent = `${stars}`;
-    if (streakEl) streakEl.textContent = `${stats.streakDays || 1} 🔥`;
-    if (countEl) countEl.textContent = stats.totalPractices || 0;
-  }
-
-  // ===================== CHAT PRACTICE ROOM =====================
-
   // ===================== CHAT PRACTICE ROOM =====================
 
   startScenario(scenarioId) {
@@ -291,21 +276,18 @@ export class UIController {
 
   startScriptedScenario(scenario, userRole = 'Customer') {
     this.activeScenario = scenario;
-    this.userRole = userRole; // 'Customer' or 'Shopkeeper'
-    this.partnerRole = userRole === 'Customer' ? 'Shopkeeper' : 'Customer';
+    this.userRole = userRole;
     this.currentScript = scenario.script || [];
     this.currentScriptIndex = 0;
     this.messageHistory = [];
     this.sessionStartTime = new Date();
 
-    const partnerIsShopkeeper = this.partnerRole === 'Shopkeeper';
-    const partnerAvatar = partnerIsShopkeeper ? '🧑‍🍳' : '👦';
-    const partnerName = partnerIsShopkeeper ? 'Shopkeeper' : 'Customer';
-    const partnerRoleTh = partnerIsShopkeeper ? 'คนขาย' : 'ลูกค้า';
-    const myRoleTh = userRole === 'Customer' ? 'Customer 👦 (ลูกค้า)' : 'Shopkeeper 🧑‍🍳 (คนขาย)';
+    const myFirstLine = this.currentScript.find(s => s.speaker === userRole);
+    this.userAvatar = myFirstLine?.avatar || '👦';
 
-    this.partnerAvatar = partnerAvatar;
-    this.userAvatar = userRole === 'Customer' ? '👦' : '🧑‍🍳';
+    const otherFirstLine = this.currentScript.find(s => s.speaker !== userRole);
+    this.partnerRole = otherFirstLine ? otherFirstLine.speaker : 'AI Partner';
+    this.partnerAvatar = otherFirstLine?.avatar || '🧑‍🍳';
 
     // Update Chat Header Info
     const avatarEl = document.getElementById('chat-partner-avatar');
@@ -314,10 +296,10 @@ export class UIController {
     const myRoleEl = document.getElementById('chat-my-role-badge');
     const titleEl = document.getElementById('chat-scenario-title');
 
-    if (avatarEl) avatarEl.textContent = partnerAvatar;
-    if (nameEl) nameEl.textContent = partnerName;
-    if (roleEl) roleEl.textContent = partnerRoleTh;
-    if (myRoleEl) myRoleEl.textContent = `คุณเล่นเป็น: ${myRoleTh}`;
+    if (avatarEl) avatarEl.textContent = this.partnerAvatar;
+    if (nameEl) nameEl.textContent = this.partnerRole;
+    if (roleEl) roleEl.textContent = otherFirstLine?.speakerTh || 'ตัวละคร AI';
+    if (myRoleEl) myRoleEl.textContent = `คุณเล่นเป็น: ${userRole} ${this.userAvatar}`;
     if (titleEl) titleEl.textContent = `${scenario.icon || '🏪'} ${scenario.title}`;
 
     // Hide suggested prompts scroller for scripted mode
@@ -364,6 +346,8 @@ export class UIController {
     const initialMsg = {
       id: 'msg_' + Date.now(),
       sender: 'partner',
+      speaker: scenario.partnerName,
+      avatar: scenario.partnerAvatar || '🐻',
       text: scenario.initialMessage,
       textTh: scenario.initialMessageTh,
       timestamp: new Date()
@@ -435,14 +419,21 @@ export class UIController {
         }
       }, 300);
     } else {
-      // ตา AI พูด
+      // ตา AI พูด (ตัวละครที่ไม่ใช่ผู้เรียน)
       if (teleprompter) teleprompter.style.display = 'none';
-      if (statusText) statusText.textContent = `${this.partnerRole} กำลังพูด...`;
+      if (statusText) statusText.textContent = `${currentLine.speaker} กำลังพูด...`;
+
+      const avatarEl = document.getElementById('chat-partner-avatar');
+      const nameEl = document.getElementById('chat-partner-name');
+      if (avatarEl) avatarEl.textContent = currentLine.avatar || '🧑‍🍳';
+      if (nameEl) nameEl.textContent = currentLine.speaker;
 
       setTimeout(() => {
         const partnerMsg = {
           id: 'msg_' + Date.now(),
           sender: 'partner',
+          speaker: currentLine.speaker,
+          avatar: currentLine.avatar || '🧑‍🍳',
           text: currentLine.text,
           textTh: currentLine.textTh,
           timestamp: new Date()
@@ -475,16 +466,15 @@ export class UIController {
     const userMsg = {
       id: 'msg_' + Date.now(),
       sender: 'user',
+      speaker: this.userRole,
+      avatar: this.userAvatar || '👦',
       text: text,
       timestamp: new Date()
     };
     this.messageHistory.push(userMsg);
     this.appendMessageBubble(userMsg);
 
-    // มอบ 1 ดาว
-    const newStars = await dbService.awardStar(1);
-    this.updateStatsBanner();
-    modalController.showToast(`⭐ เยี่ยมมาก! ออกเสียงประโยคสำเร็จ (+1 ดาว)`, 'success', 2000);
+    modalController.showToast('🎉 เยี่ยมมาก! ออกเสียงประโยคสำเร็จ', 'success', 2000);
 
     // เลื่อนบรรทัดสคริปต์
     this.currentScriptIndex++;
@@ -504,11 +494,7 @@ export class UIController {
     const statusText = document.getElementById('speech-status-indicator');
     if (statusText) statusText.textContent = '🎉 ผ่านด่านสำเร็จ!';
 
-    // มอบโบนัส +5 ดาว
-    const totalStars = await dbService.awardStar(5);
-    this.updateStatsBanner();
-
-    modalController.showToast(`🎉 ยอดเยี่ยมมากๆ เลย! พูดจบครบทั้งบทสนทนาแล้ว รับโบนัส +5 ดาวสะสม ⭐ (รวม ${totalStars} ดาว)`, 'success', 6000);
+    modalController.showToast('🎉 ยอดเยี่ยมมากๆ เลย! พูดจบครบทั้งบทสนทนาแล้ว', 'success', 5000);
 
     const durationSeconds = this.sessionStartTime ? Math.round((new Date() - this.sessionStartTime) / 1000) : 60;
     await dbService.saveConversation({
@@ -529,6 +515,9 @@ export class UIController {
     const row = document.createElement('div');
     row.className = `message-row ${isPartner ? 'partner' : 'user'}`;
     row.id = msg.id;
+
+    const speakerName = msg.speaker || (isPartner ? (this.partnerRole || 'AI') : (this.userRole || 'You'));
+    const avatar = msg.avatar || (isPartner ? (this.partnerAvatar || this.activeScenario?.partnerAvatar || '🧑‍🍳') : (this.userAvatar || '👦'));
 
     let partnerActionsHtml = '';
     if (isPartner) {
@@ -571,9 +560,12 @@ export class UIController {
 
     row.innerHTML = `
       <div class="message-avatar">
-        ${isPartner ? (this.partnerAvatar || this.activeScenario?.partnerAvatar || '🧑‍🍳') : (this.userAvatar || '👦')}
+        ${avatar}
       </div>
       <div class="message-content">
+        <div class="message-speaker-label" style="font-size: 0.78rem; font-weight: 800; color: var(--text-muted); margin-bottom: 0.2rem;">
+          ${this.escapeHtml(speakerName)}
+        </div>
         <div class="bubble">${this.escapeHtml(msg.text)}</div>
         ${partnerActionsHtml}
         ${grammarHtml}
@@ -759,10 +751,6 @@ export class UIController {
       // Speak partner reply
       speechService.speak(result.replyText);
 
-      // มอบ 1 ดาวเมื่อพูดจบแต่ละประโยค
-      await dbService.awardStar(1);
-      this.updateStatsBanner();
-
       if (statusText) statusText.textContent = 'แตะไมค์เพื่อพูด';
     } catch (e) {
       console.error('Error generating reply:', e);
@@ -791,114 +779,13 @@ export class UIController {
 
     await dbService.saveConversation(sessionData);
 
-    // มอบดาวโบนัส +3 ดาวเมื่อเล่นจบด่าน!
-    const totalStars = await dbService.awardStar(3);
-    this.updateStatsBanner();
-
-    modalController.showToast(`🌟 สุดยอดมากคนเก่ง! ผ่านด่านแล้ว รับโบนัส +3 ดาวสะสม ⭐ (รวม ${totalStars} ดาว)`, 'success', 4500);
+    modalController.showToast('🎉 เก่งมากคนเก่ง! จบการฝึกสนทนาด่านนี้แล้ว', 'success', 3500);
 
     if (returnToScenarios) {
       this.activeScenario = null;
       this.messageHistory = [];
       this.switchView('scenarios');
     }
-  }
-
-  // ===================== WORD BANK =====================
-
-  async renderWordBank() {
-    const container = document.getElementById('wordbank-list-container');
-    const countEl = document.getElementById('wordbank-count');
-    if (!container) return;
-
-    const list = await dbService.getVocabulary();
-    if (countEl) countEl.textContent = `${list.length} คำ`;
-
-    if (list.length === 0) {
-      container.innerHTML = `
-        <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-muted);">
-          <div style="font-size: 3rem; margin-bottom: 1rem;">📖</div>
-          <h3>ยังไม่มีคำศัพท์ในคลัง</h3>
-          <p>คุณสามารถกดเพิ่มคำศัพท์ใหม่ได้จากปุ่ม "เพิ่มคำศัพท์ใหม่" ด้านบน</p>
-        </div>
-      `;
-      return;
-    }
-
-    container.innerHTML = list.map(item => `
-      <div class="vocab-card">
-        <div class="vocab-word-row">
-          <div class="vocab-word">${this.escapeHtml(item.word)}</div>
-          <div class="vocab-phonetic">${this.escapeHtml(item.phonetic || '')}</div>
-        </div>
-        <div class="vocab-th">${this.escapeHtml(item.th || '')}</div>
-        ${item.example ? `<div style="font-size: 0.8rem; color: var(--text-muted); font-style: italic;">"${this.escapeHtml(item.example)}"</div>` : ''}
-        <div class="vocab-actions">
-          <button class="btn btn-secondary btn-sm btn-speak-vocab" data-word="${this.escapeHtml(item.word)}">
-            🔊 ออกเสียง
-          </button>
-          <button class="btn btn-secondary btn-sm btn-del-vocab" data-word="${this.escapeHtml(item.word)}" style="color: var(--danger);">
-            🗑️ ลบ
-          </button>
-        </div>
-      </div>
-    `).join('');
-
-    container.querySelectorAll('.btn-speak-vocab').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const word = btn.getAttribute('data-word');
-        speechService.speak(word);
-      });
-    });
-
-    container.querySelectorAll('.btn-del-vocab').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const word = btn.getAttribute('data-word');
-        if (confirm(`ลบคำว่า "${word}" ออกจากคลัง?`)) {
-          await dbService.removeVocabulary(word);
-          this.renderWordBank();
-          modalController.showToast(`ลบคำว่า "${word}" แล้ว`, 'info');
-        }
-      });
-    });
-  }
-
-  // ===================== HISTORY =====================
-
-  async renderHistory() {
-    const container = document.getElementById('history-list-container');
-    if (!container) return;
-
-    const list = await dbService.getConversations();
-
-    if (list.length === 0) {
-      container.innerHTML = `
-        <div style="text-align: center; padding: 3rem; color: var(--text-muted);">
-          <div style="font-size: 3rem; margin-bottom: 1rem;">🗓️</div>
-          <h3>ยังไม่มีประวัติการฝึกสนทนา</h3>
-          <p>เริ่มฝึกพูดในสถานการณ์จำลองเพื่อบันทึกสถิติและความก้าวหน้า</p>
-        </div>
-      `;
-      return;
-    }
-
-    container.innerHTML = list.map(item => {
-      const dateStr = item.timestamp ? new Date(item.timestamp).toLocaleString('th-TH') : 'ไม่ระบุเวลา';
-      const durationMin = Math.max(1, Math.round((item.durationSeconds || 60) / 60));
-      return `
-        <div class="history-card">
-          <div class="history-meta">
-            <h4>${item.scenarioTitle || 'Conversation Practice'}</h4>
-            <div style="font-size: 0.85rem; color: var(--text-muted);">${item.scenarioTitleTh || ''}</div>
-          </div>
-          <div class="history-details">
-            <span>📅 ${dateStr}</span>
-            <span>💬 ${item.turns || 0} ประโยค</span>
-            <span>⏱️ ${durationMin} นาที</span>
-          </div>
-        </div>
-      `;
-    }).join('');
   }
 
   escapeHtml(text) {
