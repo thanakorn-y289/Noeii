@@ -67,7 +67,20 @@ class AIService {
    * ส่งข้อความของผู้ใช้และรับคำตอบของคู่สนทนา พร้อมคำแนะนำไวยากรณ์และการแปล
    */
   async generateReply(scenario, messageHistory, userMessage) {
-    // หากมี Gemini API Key ให้ลองเรียกใช้ Gemini ก่อน
+    // 1. ตรวจสอบกรณีด่านคณิตศาสตร์ช้อปปิ้งแบบไดนามิก (Supermarket Math)
+    if (scenario.id === 'supermarket-math' || scenario.isDynamicMath) {
+      if (this.geminiApiKey) {
+        try {
+          const geminiResult = await this.callGeminiApi(scenario, messageHistory, userMessage);
+          if (geminiResult) return geminiResult;
+        } catch (e) {
+          console.warn('Gemini API call failed, falling back to built-in math engine:', e);
+        }
+      }
+      return this.generateSupermarketMathReply(scenario, messageHistory, userMessage);
+    }
+
+    // 2. หากมี Gemini API Key ให้ลองเรียกใช้ Gemini ก่อน
     if (this.geminiApiKey) {
       try {
         const geminiResult = await this.callGeminiApi(scenario, messageHistory, userMessage);
@@ -77,8 +90,302 @@ class AIService {
       }
     }
 
-    // Built-in Smart Dialogue Engine
+    // 3. Built-in Smart Dialogue Engine
     return this.generateBuiltinReply(scenario, messageHistory, userMessage);
+  }
+
+  /**
+   * ระบบคำนวณและเข้าใจภาษาแบบ Dynamic สำหรับ Supermarket Math & Shopping
+   */
+  generateSupermarketMathReply(scenario, history, userText) {
+    const lower = userText.toLowerCase().trim();
+    const grammarFeedback = this.analyzeGrammar(userText);
+
+    const catalog = [
+      { id: 'rice', name: 'rice', phrase: 'a bag of rice', price: 95, emoji: '🌾', th: 'ข้าวสาร (95฿)' },
+      { id: 'icecream', name: 'ice cream', phrase: 'a box of ice cream', price: 73, emoji: '🍦', th: 'ไอศกรีม (73฿)' },
+      { id: 'eggs', name: 'eggs', phrase: 'a dozen eggs', price: 42, emoji: '🥚', th: 'ไข่ไก่ 1 โหล (42฿)' },
+      { id: 'cookies', name: 'cookies', phrase: 'a can of cookies', price: 50, emoji: '🍪', th: 'คุกกี้ (50฿)' },
+      { id: 'jam', name: 'jam', phrase: 'a jar of jam', price: 30, emoji: '🍓', th: 'แยม (30฿)' },
+      { id: 'milk', name: 'milk', phrase: 'a carton of milk', price: 25, emoji: '🥛', th: 'นม (25฿)' },
+      { id: 'cake', name: 'cake', phrase: 'a cake', price: 85, emoji: '🎂', th: 'เค้ก (85฿)' },
+      { id: 'softdrink', name: 'soft drink', phrase: 'a bottle of soft drink', price: 32, emoji: '🥤', th: 'น้ำอัดลม (32฿)' }
+    ];
+
+    // 1. ตรวจสอบกรณีแม่ให้เงิน 180 บาท ซื้อข้าวสารและของที่อยากได้ 1 อย่าง (Task 5 ในแบบฝึกหัด)
+    if (lower.includes('180') || (lower.includes('mother') && lower.includes('rice'))) {
+      const otherItems = catalog.filter(item => item.id !== 'rice');
+      let chosenItem = null;
+
+      for (const item of otherItems) {
+        if (lower.includes(item.name) || lower.includes(item.id)) {
+          chosenItem = item;
+          break;
+        }
+      }
+
+      if (chosenItem) {
+        const total = 95 + chosenItem.price;
+        const change = 180 - total;
+
+        if (change === 0) {
+          return {
+            replyText: `Wonderful choice! A bag of rice is 95 baht and ${chosenItem.phrase} is ${chosenItem.price} baht. 95 + ${chosenItem.price} = 180 baht exactly! You used all your budget with zero change!`,
+            replyTextTh: `เลือกได้ยอดเยี่ยมมากครับ! ข้าวสาร 95 บาท และ${chosenItem.th} ราคา ${chosenItem.price} บาท รวมเป็น 180 บาทพอดีเป๊ะเลยครับ ไม่มีเงินทอน!`,
+            grammarFeedback,
+            suggestedPrompts: [
+              "Here is 180 baht, thank you!",
+              "I love cake so much!",
+              "Thank you, goodbye!"
+            ]
+          };
+        } else if (change > 0) {
+          return {
+            replyText: `Great pick! A bag of rice is 95 baht and ${chosenItem.phrase} is ${chosenItem.price} baht. That comes to ${total} baht. Since your mother gave you 180 baht, your change is ${change} baht (180 - ${total} = ${change} ฿)!`,
+            replyTextTh: `เลือกได้ดีมากครับ! ข้าวสาร 95 บาท และ${chosenItem.th} ราคา ${chosenItem.price} บาท รวมเป็น ${total} บาท คุณแม่ให้มา 180 บาท หนูจะได้เงินทอนกลับไป ${change} บาทครับ (180 - ${total} = ${change} ฿)!`,
+            grammarFeedback,
+            suggestedPrompts: [
+              "Thank you! Here is 180 baht.",
+              `I will return ${change} baht to my mother.`,
+              "Goodbye!"
+            ]
+          };
+        } else {
+          return {
+            replyText: `Oh, a bag of rice is 95 baht and ${chosenItem.phrase} is ${chosenItem.price} baht. That would be ${total} baht, which exceeds 180 baht by ${Math.abs(change)} baht. Would you like a different treat?`,
+            replyTextTh: `โอ๊ะ ข้าวสาร 95 บาท และ${chosenItem.th} ราคา ${chosenItem.price} บาท รวมเป็น ${total} บาท เกินงบ 180 บาทไป ${Math.abs(change)} บาทครับ อยากลองเลือกของชิ้นอื่นแทนไหมครับ?`,
+            grammarFeedback,
+            suggestedPrompts: [
+              "How about a box of ice cream?",
+              "I will pick a can of cookies instead.",
+              "Let me choose a cake for 85 baht."
+            ]
+          };
+        }
+      } else {
+        return {
+          replyText: "Your mother gave you 180 baht! A bag of rice is 95 baht, leaving you with 85 baht (180 - 95 = 85 ฿). What treat would you like to buy with your remaining 85 baht? You can choose a cake (85฿), ice cream (73฿), cookies (50฿), eggs (42฿), soft drink (32฿), jam (30฿), or milk (25฿)!",
+          replyTextTh: "คุณแม่ให้เงินมา 180 บาท ข้าวสารราคา 95 บาท หนูจะมีเงินเหลือสำหรับของที่อยากได้ 85 บาทครับ (180 - 95 = 85 ฿) อยากซื้ออะไรในงบ 85 บาทดีครับ? เช่น เค้ก 85฿, ไอศกรีม 73฿, คุกกี้ 50฿ ฯลฯ",
+          grammarFeedback,
+          suggestedPrompts: [
+            "I will buy a cake for 85 baht!",
+            "I want a box of ice cream, please.",
+            "Can I have a can of cookies?"
+          ]
+        };
+      }
+    }
+
+    // 2. ตรวจสอบการจ่ายเงินและการทอนเงิน (Payment & Change)
+    const payMatch = lower.match(/(?:here\s+is|have|pay|give)\s*(\d+)|(\d+)\s*(?:baht|thb|฿)/i);
+    const asksChange = lower.includes('change') || lower.includes('how much change');
+
+    if (payMatch || asksChange) {
+      let paymentAmount = payMatch ? parseInt(payMatch[1] || payMatch[2], 10) : 0;
+      if (!paymentAmount && lower.includes('500')) paymentAmount = 500;
+      if (!paymentAmount && lower.includes('200')) paymentAmount = 200;
+      if (!paymentAmount && lower.includes('100')) paymentAmount = 100;
+
+      // ค้นหายอดเงินจากประวัติการสนทนาล่าสุด (หาประโยคที่ AI เคยบอกราคา)
+      let recentTotal = 0;
+      for (let i = history.length - 1; i >= 0; i--) {
+        const hText = history[i].text;
+        const totalMatches = [...hText.matchAll(/(\d+)\s*baht/gi)];
+        if (totalMatches.length > 0) {
+          recentTotal = parseInt(totalMatches[totalMatches.length - 1][1], 10);
+          break;
+        }
+      }
+
+      if (!recentTotal && paymentAmount === 500) {
+        recentTotal = 120;
+      } else if (!recentTotal) {
+        recentTotal = 120;
+      }
+
+      if (paymentAmount > 0) {
+        const changeAmount = paymentAmount - recentTotal;
+        if (changeAmount >= 0) {
+          return {
+            replyText: `You gave me ${paymentAmount} baht. The total is ${recentTotal} baht. Your change is ${changeAmount} baht (${paymentAmount} - ${recentTotal} = ${changeAmount} ฿)! Here is your change and receipt. Thank you very much! Goodbye!`,
+            replyTextTh: `คุณให้เงินมา ${paymentAmount} บาท ยอดรวมคือ ${recentTotal} บาท เงินทอนของคุณคือ ${changeAmount} บาทครับ (${paymentAmount} - ${recentTotal} = ${changeAmount} ฿)! นี่เงินทอนและใบเสร็จครับ ขอบคุณมากๆ ครับ ลาก่อนนะครับ!`,
+            grammarFeedback,
+            suggestedPrompts: [
+              "Thank you! Goodbye!",
+              "Have a nice day!",
+              "I would like to buy something else."
+            ]
+          };
+        } else {
+          const needed = Math.abs(changeAmount);
+          return {
+            replyText: `The total is ${recentTotal} baht, but you gave me ${paymentAmount} baht. You still need ${needed} more baht, please!`,
+            replyTextTh: `ยอดรวมทั้งหมด ${recentTotal} บาท แต่หนูให้มา ${paymentAmount} บาท ยังขาดอีก ${needed} บาทครับผม!`,
+            grammarFeedback,
+            suggestedPrompts: [
+              `Here is another ${needed} baht.`,
+              "Let me check my wallet.",
+              "I have 500 baht."
+            ]
+          };
+        }
+      }
+    }
+
+    // 3. ตรวจจับการสั่งซื้อสินค้าและคำนวณราคา (Dynamic Basket Calculation)
+    const detectedItems = [];
+
+    const extractQuantity = (text, itemName, unitWords = []) => {
+      const allWords = [itemName, ...unitWords].join('|');
+      const numWords = {
+        'a': 1, 'an': 1, 'one': 1, '1': 1,
+        'two': 2, '2': 2,
+        'three': 3, '3': 3,
+        'four': 4, '4': 4,
+        'five': 5, '5': 5,
+        'six': 6, '6': 6,
+        'seven': 7, '7': 7,
+        'eight': 8, '8': 8,
+        'nine': 9, '9': 9,
+        'ten': 10, '10': 10,
+        'a dozen': 1, 'two dozen': 2, 'three dozen': 3
+      };
+
+      const regex = new RegExp(`(two\\s+dozen|three\\s+dozen|a\\s+dozen|\\d+|one|two|three|four|five|six|seven|eight|nine|ten|a|an)?\\s*(?:carton|cartons|bag|bags|box|boxes|can|cans|jar|jars|bottle|bottles|dozen|dozens)?\\s*(?:of)?\\s*(?:${allWords})`, 'i');
+      const match = text.match(regex);
+      if (match) {
+        const qStr = (match[1] || 'a').toLowerCase().trim();
+        return numWords[qStr] || parseInt(qStr, 10) || 1;
+      }
+      return 1;
+    };
+
+    if (lower.includes('milk')) {
+      const q = extractQuantity(lower, 'milk', ['carton', 'cartons']);
+      detectedItems.push({ item: catalog.find(i => i.id === 'milk'), qty: q, subtotal: q * 25 });
+    }
+    if (lower.includes('rice')) {
+      const q = extractQuantity(lower, 'rice', ['bag', 'bags']);
+      detectedItems.push({ item: catalog.find(i => i.id === 'rice'), qty: q, subtotal: q * 95 });
+    }
+    if (lower.includes('egg')) {
+      const q = extractQuantity(lower, 'egg', ['eggs', 'dozen', 'dozens']);
+      detectedItems.push({ item: catalog.find(i => i.id === 'eggs'), qty: q, subtotal: q * 42 });
+    }
+    if (lower.includes('ice cream') || lower.includes('icecream')) {
+      const q = extractQuantity(lower, 'ice cream', ['box', 'boxes', 'tub', 'tubs']);
+      detectedItems.push({ item: catalog.find(i => i.id === 'icecream'), qty: q, subtotal: q * 73 });
+    }
+    if (lower.includes('cookie')) {
+      const q = extractQuantity(lower, 'cookie', ['cookies', 'can', 'cans']);
+      detectedItems.push({ item: catalog.find(i => i.id === 'cookies'), qty: q, subtotal: q * 50 });
+    }
+    if (lower.includes('jam')) {
+      const q = extractQuantity(lower, 'jam', ['jar', 'jars']);
+      detectedItems.push({ item: catalog.find(i => i.id === 'jam'), qty: q, subtotal: q * 30 });
+    }
+    if (lower.includes('cake')) {
+      const q = extractQuantity(lower, 'cake', ['piece', 'pieces']);
+      detectedItems.push({ item: catalog.find(i => i.id === 'cake'), qty: q, subtotal: q * 85 });
+    }
+    if (lower.includes('soft drink') || lower.includes('softdrink') || lower.includes('soda') || lower.includes('coke') || (lower.includes('drink') && !lower.includes('ice cream'))) {
+      const q = extractQuantity(lower, 'soft drink', ['bottle', 'bottles', 'soda']);
+      detectedItems.push({ item: catalog.find(i => i.id === 'softdrink'), qty: q, subtotal: q * 32 });
+    }
+
+    if (detectedItems.length > 0) {
+      const total = detectedItems.reduce((acc, cur) => acc + cur.subtotal, 0);
+
+      const breakdownEn = detectedItems.map(d => {
+        const qtyText = d.qty === 1 ? d.item.phrase : `${d.qty} ${d.item.name}s`;
+        return `${qtyText} (${d.subtotal} ฿)`;
+      }).join(', ');
+
+      const calculationFormula = detectedItems.map(d => `${d.subtotal}`).join(' + ') + ` = ${total} ฿`;
+
+      const breakdownTh = detectedItems.map(d => {
+        return `${d.item.th} ${d.qty > 1 ? `จำนวน ${d.qty}` : ''} (${d.subtotal} บาท)`;
+      }).join(', ');
+
+      return {
+        replyText: `Certainly! Here is your order: ${breakdownEn}. That comes to ${calculationFormula}. That will be ${total} baht in total, please! How would you like to pay?`,
+        replyTextTh: `ได้เลยครับ! รายการสินค้าของคุณคือ ${breakdownTh} รวมเป็นเงิน ${calculationFormula} ทั้งหมด ${total} บาทครับ! วันนี้ชำระเงินอย่างไรดีครับ?`,
+        grammarFeedback,
+        suggestedPrompts: [
+          "Here is 500 baht.",
+          `Here is ${total} baht exact change.`,
+          "How much change will I get from 500 baht?",
+          "Can I also add a bottle of soft drink?"
+        ]
+      };
+    }
+
+    // 3.5 ถามราคารวม เช่น "How much is it?" หรือ "How much altogether?"
+    if (lower.includes('how much') && !detectedItems.length) {
+      let recentTotal = 0;
+      for (let i = history.length - 1; i >= 0; i--) {
+        const hText = history[i].text;
+        const totalMatches = [...hText.matchAll(/(\d+)\s*baht/gi)];
+        if (totalMatches.length > 0) {
+          recentTotal = parseInt(totalMatches[totalMatches.length - 1][1], 10);
+          break;
+        }
+      }
+      if (recentTotal > 0) {
+        return {
+          replyText: `That will be ${recentTotal} baht in total, please!`,
+          replyTextTh: `ทั้งหมดเป็นเงิน ${recentTotal} บาทครับผม!`,
+          grammarFeedback,
+          suggestedPrompts: [
+            `Here is ${recentTotal} baht exact.`,
+            "Here is 500 baht.",
+            "How much change will I get from 500 baht?"
+          ]
+        };
+      }
+    }
+
+    // 3.6 คำขอบคุณหรือกล่าวลา (Thank you / Bye)
+    if (lower.includes('thank') || lower.includes('bye') || lower.includes('goodbye')) {
+      return {
+        replyText: "You are very welcome! Thank you for shopping with us today. Have a wonderful day and goodbye!",
+        replyTextTh: "ยินดีมากๆ ครับ! ขอบคุณที่มาอุดหนุนซูเปอร์มาร์เก็ตของเรา ขอให้เป็นวันที่ดีและลาก่อนนะครับ!",
+        grammarFeedback,
+        suggestedPrompts: [
+          "Thank you! Bye bye!",
+          "I want to buy something else."
+        ]
+      };
+    }
+
+    // 4. ถามราคาสินค้าเดี่ยว (Price inquiry: "How much is...")
+    for (const item of catalog) {
+      if (lower.includes(item.name) || lower.includes(item.id)) {
+        return {
+          replyText: `${item.phrase.charAt(0).toUpperCase() + item.phrase.slice(1)} is ${item.price} baht! Would you like to buy one?`,
+          replyTextTh: `${item.th} ราคา ${item.price} บาทครับ! วันนี้รับสักชิ้นไหมครับ?`,
+          grammarFeedback,
+          suggestedPrompts: [
+            `Yes, I want ${item.phrase}, please!`,
+            "What else do you have?",
+            "How much is a bag of rice and milk?"
+          ]
+        };
+      }
+    }
+
+    // 5. ตอบคำถามทักทายทั่วไป หรือยังไม่ได้ระบุสินค้า
+    return {
+      replyText: "Hello! Welcome to our supermarket! Today we have milk (25฿), rice (95฿), eggs (42฿), cookies (50฿), jam (30฿), ice cream (73฿), cake (85฿), and soft drinks (32฿). What would you like to buy today?",
+      replyTextTh: "สวัสดีครับ! ยินดีต้อนรับสู่ซูเปอร์มาร์เก็ต วันนี้เรามี นม (25฿), ข้าวสาร (95฿), ไข่ไก่ (42฿), คุกกี้ (50฿), แยม (30฿), ไอศกรีม (73฿), เค้ก (85฿) และน้ำอัดลม (32฿) วันนี้อยากซื้ออะไรดีครับ?",
+      grammarFeedback,
+      suggestedPrompts: [
+        "I want to buy a carton of milk and a bag of rice.",
+        "I would like a dozen eggs and a box of ice cream.",
+        "A jar of jam, a can of cookies, and a bottle of soft drink, please.",
+        "My mother gave me 180 baht to buy rice. I also want a cake!"
+      ]
+    };
   }
 
   /**
@@ -406,7 +713,7 @@ class AIService {
   async callGeminiApi(scenario, history, userText) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.geminiApiKey}`;
 
-    const systemPrompt = `You are playing the role of ${scenario.partnerName}, a ${scenario.partnerRole} in an English conversation practice app for English learners.
+    let systemPrompt = `You are playing the role of ${scenario.partnerName}, a ${scenario.partnerRole} in an English conversation practice app for English learners.
 Scenario: ${scenario.title}.
 Your goal: Help the user practice natural English speaking. Respond conversationally in natural English (keep responses concise, around 2-3 sentences), ask engaging follow-ups, and provide a Thai translation of your response.
 Also analyze the user's sentence for grammar improvements or more natural native phrasings.
@@ -418,6 +725,18 @@ Output must strictly be valid JSON format matching this schema:
   "grammarTip": "คำแนะนำสั้นๆ ถ้าประโยคของผู้ใช้สามารถพูดให้เป็นธรรมชาติขึ้นได้ หรือคำชมถ้าดีอยู่แล้ว",
   "suggestedPrompts": ["ทางเลือกประโยคที่ผู้เรียนสามารถพูดตอบกลับได้ 1", "ทางเลือก 2", "ทางเลือก 3"]
 }`;
+
+    if (scenario.isDynamicMath || scenario.itemsCatalog) {
+      const priceListStr = (scenario.itemsCatalog || []).map(i => `- ${i.name} (${i.unitPhrase}): ฿${i.price} (${i.th})`).join('\n');
+      systemPrompt += `\n\nCRITICAL CONTEXT - SUPERMARKET PRICE BOARD:\n${priceListStr}\n
+CRITICAL MATHEMATICAL RULES:
+1. Always calculate prices, totals, and change with 100% mathematical accuracy using the Price Board.
+2. Prices and money are in Thai Baht (฿).
+3. If user orders items, list the items, calculate the exact sum, and ask for payment.
+4. If user pays (e.g. 500 baht), calculate: Payment - Total = Change. State the exact change politely.
+5. If user mentions 180 baht to buy rice (95฿) and one other item, calculate remaining budget: 180 - 95 = 85฿. If they choose cake (85฿), total is 180฿ exact. If ice cream (73฿), change is 12฿, etc.
+6. Keep English and Thai friendly, encouraging, and clear for elementary students.`;
+    }
 
     const contents = [
       { role: 'user', parts: [{ text: systemPrompt }] }

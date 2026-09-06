@@ -58,6 +58,11 @@ export class UIController {
     this.currentView = viewName;
     document.body.classList.toggle('in-chat-view', viewName === 'chat');
 
+    if (viewName !== 'chat') {
+      const catalogBar = document.getElementById('chat-catalog-bar');
+      if (catalogBar) catalogBar.style.display = 'none';
+    }
+
     // Update active tab styles
     document.querySelectorAll('.nav-tab').forEach(tab => {
       tab.classList.toggle('active', tab.getAttribute('data-view') === viewName);
@@ -306,6 +311,9 @@ export class UIController {
     const promptsBar = document.getElementById('suggested-prompts-bar');
     if (promptsBar) promptsBar.style.display = 'none';
 
+    const catalogBar = document.getElementById('chat-catalog-bar');
+    if (catalogBar) catalogBar.style.display = 'none';
+
     // Clear feed
     const messagesFeed = document.getElementById('chat-messages-feed');
     if (messagesFeed) messagesFeed.innerHTML = '';
@@ -340,6 +348,9 @@ export class UIController {
 
     const messagesFeed = document.getElementById('chat-messages-feed');
     if (messagesFeed) messagesFeed.innerHTML = '';
+
+    // Render Price Board / Catalog bar if present
+    this.renderCatalogBar(scenario.itemsCatalog);
 
     this.switchView('chat');
 
@@ -609,6 +620,51 @@ export class UIController {
       chip.addEventListener('click', () => {
         const text = chip.getAttribute('data-prompt');
         this.sendUserMessage(text);
+      });
+    });
+  }
+
+  renderCatalogBar(catalog) {
+    const bar = document.getElementById('chat-catalog-bar');
+    const container = document.getElementById('catalog-scroll-container');
+    if (!bar || !container) return;
+
+    if (!catalog || catalog.length === 0) {
+      bar.style.display = 'none';
+      container.innerHTML = '';
+      return;
+    }
+
+    bar.style.display = 'flex';
+    container.innerHTML = catalog.map(item => {
+      const fullName = item.unit ? `a ${item.unit} of ${item.name}` : `a ${item.name}`;
+      return `
+        <button class="catalog-item-chip" type="button" data-name="${this.escapeHtml(item.name)}" data-unit="${this.escapeHtml(item.unit || '')}" data-price="${item.price}" data-fullname="${this.escapeHtml(fullName)}" title="กดเพื่อใส่ลงในช่องประโยค">
+          <span class="item-emoji">${item.emoji || '📦'}</span>
+          <span class="item-info">
+            <span class="item-name">${this.escapeHtml(fullName)}</span>
+            <span class="item-name-th">${this.escapeHtml(item.nameTh || '')}</span>
+          </span>
+          <span class="price-tag">${item.price} ฿</span>
+        </button>
+      `;
+    }).join('');
+
+    container.querySelectorAll('.catalog-item-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const fullName = chip.getAttribute('data-fullname');
+        const textInput = document.getElementById('chat-input-text');
+        if (!textInput) return;
+
+        const currentVal = textInput.value.trim();
+        if (!currentVal) {
+          textInput.value = `I would like to buy ${fullName}, please.`;
+        } else if (currentVal.endsWith('.')) {
+          textInput.value = currentVal.slice(0, -1) + ` and ${fullName}.`;
+        } else {
+          textInput.value = currentVal + ` and ${fullName}`;
+        }
+        textInput.focus();
       });
     });
   }
