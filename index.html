@@ -140,15 +140,16 @@
         <div class="chat-room-header">
           <div class="partner-info">
             <div class="partner-avatar-box">
-              <span id="chat-partner-avatar">🐻</span>
+              <span id="chat-partner-avatar">🧑‍🍳</span>
               <span class="speaking-indicator-dot" id="chat-speaking-dot"></span>
             </div>
             <div class="partner-meta">
               <h3>
-                <span id="chat-partner-name">Mimi</span>
-                <span class="partner-role-badge" id="chat-partner-role">Ice Cream Maker</span>
+                <span id="chat-partner-name">Shopkeeper</span>
+                <span class="partner-role-badge" id="chat-partner-role">คนขาย</span>
+                <span class="partner-role-badge" id="chat-my-role-badge" style="background:#dbeafe; color:#1e40af;">คุณเล่นเป็น: Customer 👦</span>
               </h3>
-              <div class="partner-scenario-title" id="chat-scenario-title">🍦 Ice Cream & Sweet Shop</div>
+              <div class="partner-scenario-title" id="chat-scenario-title">🏪 At the Grocery Store</div>
             </div>
           </div>
           <div class="chat-room-actions">
@@ -161,6 +162,31 @@
         <!-- Messages Feed -->
         <div class="chat-messages" id="chat-messages-feed">
           <!-- Bubbles added dynamically -->
+        </div>
+
+        <!-- Teleprompter / Guided Reading Box -->
+        <div class="teleprompter-box" id="guided-teleprompter" style="display: none;">
+          <div class="teleprompter-header">
+            <span class="teleprompter-badge">📖 ประโยคที่หนูต้องพูด (Your Turn to Speak)</span>
+            <span class="teleprompter-step" id="teleprompter-step-indicator">ประโยคที่ 1 / 8</span>
+          </div>
+          <div class="teleprompter-text" id="teleprompter-text">
+            "Good afternoon! Can I help you?"
+          </div>
+          <div class="teleprompter-th" id="teleprompter-th">
+            สวัสดีตอนบ่ายครับ! มีอะไรให้ผมช่วยไหมครับ?
+          </div>
+          <div class="teleprompter-actions">
+            <button class="btn-teleprompter btn-tele-listen" id="btn-tele-listen" title="กดฟังเสียงตัวอย่าง">
+              🔊 ฟังตัวอย่างเสียง
+            </button>
+            <button class="btn-teleprompter btn-tele-mic" id="btn-tele-mic" title="เปิดไมค์เพื่ออ่านออกเสียง">
+              🎙️ เปิดไมค์อ่านออกเสียง
+            </button>
+            <button class="btn-teleprompter btn-tele-send" id="btn-tele-send" title="ส่งประโยคนี้ทันที">
+              ⚡ ส่งทันที
+            </button>
+          </div>
         </div>
 
         <!-- Suggested Prompts -->
@@ -181,7 +207,7 @@
 
             <!-- Text Input Fallback -->
             <div class="input-text-wrapper">
-              <input type="text" id="chat-input-text" class="chat-text-input" placeholder="กดไมค์เพื่อพูดภาษาอังกฤษ หรือพิมพ์ตรงนี้จ้า...">
+              <input type="text" id="chat-input-text" class="chat-text-input" placeholder="กดไมค์เพื่อพูดประโยคข้างบน หรือพิมพ์ที่นี่...">
               <button class="btn-send" id="btn-chat-send" title="ส่งข้อความ">
                 ➤
               </button>
@@ -235,6 +261,49 @@
   </footer>
 
   <!-- ==================== MODALS ==================== -->
+
+  <!-- 0. Role Selection Modal (เลือกบทบาท Shopkeeper หรือ Customer) -->
+  <div class="modal-overlay" id="role-selection-modal">
+    <div class="modal-box" style="max-width: 540px;">
+      <div class="modal-header">
+        <h3>🎭 เลือกบทบาทที่คุณต้องการเล่น</h3>
+        <button class="modal-close" id="btn-close-role-modal">&times;</button>
+      </div>
+      <div class="modal-body" style="text-align: center;">
+        <p style="color: var(--text-muted); font-size: 1rem; font-weight: 700;">
+          🏪 ด่าน: At the Grocery Store (ร้านขายของชำ)<br>
+          หนูอยากสวมบทบาทเป็นใครในบทสนทนานี้ดีเอ่ย?
+        </p>
+        <div class="role-selection-grid">
+          <!-- Option 1: Customer -->
+          <div class="role-card-select customer" id="btn-select-customer">
+            <div class="role-avatar-big">👦</div>
+            <div class="role-name-big">Customer (ลูกค้า)</div>
+            <div class="role-desc-small">
+              หนูเป็นคนซื้อของ<br>
+              (สั่งซื้อแยมและมันฝรั่งทอด)
+            </div>
+            <button class="btn btn-primary btn-sm" style="margin-top: 0.85rem; width: 100%;">
+              เล่นเป็นลูกค้า 🛍️
+            </button>
+          </div>
+
+          <!-- Option 2: Shopkeeper -->
+          <div class="role-card-select shopkeeper" id="btn-select-shopkeeper">
+            <div class="role-avatar-big">🧑‍🍳</div>
+            <div class="role-name-big">Shopkeeper (คนขาย)</div>
+            <div class="role-desc-small">
+              หนูเป็นเจ้าของร้าน<br>
+              (ทักทายและคิดเงินลูกค้า)
+            </div>
+            <button class="btn btn-rainbow btn-sm" style="margin-top: 0.85rem; width: 100%;">
+              เล่นเป็นคนขาย 🏪
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- 1. Custom Scenario Builder Modal (สำหรับครู/ผู้ปกครอง) -->
   <div class="modal-overlay" id="custom-scenario-modal">

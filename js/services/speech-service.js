@@ -176,6 +176,7 @@ class SpeechService {
   speak(text, options = {}) {
     if (!('speechSynthesis' in window)) return;
     this.stopSpeaking();
+    this.stopListening();
 
     if (!text || !text.trim()) return;
 

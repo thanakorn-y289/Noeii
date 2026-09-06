@@ -270,24 +270,58 @@ export class UIController {
 
   // ===================== CHAT PRACTICE ROOM =====================
 
+  // ===================== CHAT PRACTICE ROOM =====================
+
   startScenario(scenarioId) {
     const scenario = (this.allScenarios || SCENARIOS).find(s => s.id === scenarioId) || SCENARIOS[0];
     if (!scenario) return;
 
+    // ถ้าเป็นบทสนทนาที่มี Script ลำดับบทพูด ให้เปิดหน้าต่างเลือกบทบาทก่อน
+    if (scenario.script && scenario.script.length > 0) {
+      modalController.openRoleSelectionModal(scenario, (selectedRole) => {
+        this.startScriptedScenario(scenario, selectedRole);
+      });
+      return;
+    }
+
+    // กรณีบทสนทนาแบบอิสระ (Custom Scenario ทั่วไป)
+    this.startFreeScenario(scenario);
+  }
+
+  startScriptedScenario(scenario, userRole = 'Customer') {
     this.activeScenario = scenario;
+    this.userRole = userRole; // 'Customer' or 'Shopkeeper'
+    this.partnerRole = userRole === 'Customer' ? 'Shopkeeper' : 'Customer';
+    this.currentScript = scenario.script || [];
+    this.currentScriptIndex = 0;
     this.messageHistory = [];
     this.sessionStartTime = new Date();
+
+    const partnerIsShopkeeper = this.partnerRole === 'Shopkeeper';
+    const partnerAvatar = partnerIsShopkeeper ? '🧑‍🍳' : '👦';
+    const partnerName = partnerIsShopkeeper ? 'Shopkeeper' : 'Customer';
+    const partnerRoleTh = partnerIsShopkeeper ? 'คนขาย' : 'ลูกค้า';
+    const myRoleTh = userRole === 'Customer' ? 'Customer 👦 (ลูกค้า)' : 'Shopkeeper 🧑‍🍳 (คนขาย)';
+
+    this.partnerAvatar = partnerAvatar;
+    this.userAvatar = userRole === 'Customer' ? '👦' : '🧑‍🍳';
 
     // Update Chat Header Info
     const avatarEl = document.getElementById('chat-partner-avatar');
     const nameEl = document.getElementById('chat-partner-name');
     const roleEl = document.getElementById('chat-partner-role');
+    const myRoleEl = document.getElementById('chat-my-role-badge');
     const titleEl = document.getElementById('chat-scenario-title');
 
-    if (avatarEl) avatarEl.textContent = scenario.partnerAvatar;
-    if (nameEl) nameEl.textContent = scenario.partnerName;
-    if (roleEl) roleEl.textContent = scenario.partnerRole;
-    if (titleEl) titleEl.textContent = `${scenario.icon} ${scenario.title}`;
+    if (avatarEl) avatarEl.textContent = partnerAvatar;
+    if (nameEl) nameEl.textContent = partnerName;
+    if (roleEl) roleEl.textContent = partnerRoleTh;
+    if (myRoleEl) myRoleEl.textContent = `คุณเล่นเป็น: ${myRoleTh}`;
+    if (titleEl) titleEl.textContent = `${scenario.icon || '🏪'} ${scenario.title}`;
+
+    // Hide suggested prompts scroller for scripted mode
+    const promptsBar = document.getElementById('suggested-prompts-bar');
+    if (promptsBar) promptsBar.style.display = 'none';
 
     // Clear feed
     const messagesFeed = document.getElementById('chat-messages-feed');
@@ -296,7 +330,36 @@ export class UIController {
     // Switch View
     this.switchView('chat');
 
-    // Add partner's opening line
+    // Start running the script
+    this.processNextScriptTurn();
+  }
+
+  startFreeScenario(scenario) {
+    this.currentScript = null;
+    this.activeScenario = scenario;
+    this.messageHistory = [];
+    this.sessionStartTime = new Date();
+
+    const avatarEl = document.getElementById('chat-partner-avatar');
+    const nameEl = document.getElementById('chat-partner-name');
+    const roleEl = document.getElementById('chat-partner-role');
+    const myRoleEl = document.getElementById('chat-my-role-badge');
+    const titleEl = document.getElementById('chat-scenario-title');
+
+    if (avatarEl) avatarEl.textContent = scenario.partnerAvatar || '🐻';
+    if (nameEl) nameEl.textContent = scenario.partnerName;
+    if (roleEl) roleEl.textContent = scenario.partnerRole;
+    if (myRoleEl) myRoleEl.textContent = `โหมดคุยอิสระ 💬`;
+    if (titleEl) titleEl.textContent = `${scenario.icon || '💬'} ${scenario.title}`;
+
+    const teleprompter = document.getElementById('guided-teleprompter');
+    if (teleprompter) teleprompter.style.display = 'none';
+
+    const messagesFeed = document.getElementById('chat-messages-feed');
+    if (messagesFeed) messagesFeed.innerHTML = '';
+
+    this.switchView('chat');
+
     const initialMsg = {
       id: 'msg_' + Date.now(),
       sender: 'partner',
@@ -306,12 +369,155 @@ export class UIController {
     };
     this.messageHistory.push(initialMsg);
     this.appendMessageBubble(initialMsg);
-
-    // Render suggested prompts
     this.renderSuggestedPrompts(scenario.suggestedPrompts);
-
-    // Speak partner's opening message automatically
     speechService.speak(scenario.initialMessage);
+  }
+
+  processNextScriptTurn() {
+    this.isSubmittingScriptLine = false;
+    if (!this.currentScript || this.currentScriptIndex >= this.currentScript.length) {
+      this.handleScriptCompleted();
+      return;
+    }
+
+    const currentLine = this.currentScript[this.currentScriptIndex];
+    const isMyTurn = currentLine.speaker === this.userRole;
+    this.currentExpectedLine = currentLine;
+
+    const teleprompter = document.getElementById('guided-teleprompter');
+    const statusText = document.getElementById('speech-status-indicator');
+
+    if (isMyTurn) {
+      // ตาผู้เรียนพูด: แสดง Teleprompter แนะนำคำพูด
+      if (teleprompter) {
+        teleprompter.style.display = 'flex';
+        document.getElementById('teleprompter-step-indicator').textContent = `ประโยคที่ ${this.currentScriptIndex + 1} / ${this.currentScript.length}`;
+        document.getElementById('teleprompter-text').textContent = `"${currentLine.text}"`;
+        document.getElementById('teleprompter-th').textContent = currentLine.textTh;
+
+        const btnListen = document.getElementById('btn-tele-listen');
+        if (btnListen) {
+          btnListen.onclick = () => speechService.speak(currentLine.text);
+        }
+
+        const btnMic = document.getElementById('btn-tele-mic');
+        if (btnMic) {
+          btnMic.onclick = () => {
+            if (!speechService.isListening) {
+              speechService.startListening();
+            }
+          };
+        }
+
+        const btnSend = document.getElementById('btn-tele-send');
+        if (btnSend) {
+          btnSend.onclick = () => this.submitUserScriptLine(currentLine.text);
+        }
+      }
+
+      if (statusText) statusText.textContent = 'อ่านออกเสียงประโยคนี้ได้เลยครับ 🎙️';
+
+      const textInput = document.getElementById('chat-input-text');
+      if (textInput) {
+        textInput.placeholder = `กดไมค์พูดว่า: "${currentLine.text}"`;
+        textInput.value = '';
+      }
+
+      // พยายามเปิดไมค์ให้อัตโนมัติ เพื่อให้เด็กๆ อ่านออกเสียงได้ทันที
+      setTimeout(() => {
+        try {
+          if (!speechService.isListening && !speechService.isSpeaking) {
+            speechService.startListening();
+          }
+        } catch (e) {
+          console.log('Mic autostart deferred:', e);
+        }
+      }, 300);
+    } else {
+      // ตา AI พูด
+      if (teleprompter) teleprompter.style.display = 'none';
+      if (statusText) statusText.textContent = `${this.partnerRole} กำลังพูด...`;
+
+      setTimeout(() => {
+        const partnerMsg = {
+          id: 'msg_' + Date.now(),
+          sender: 'partner',
+          text: currentLine.text,
+          textTh: currentLine.textTh,
+          timestamp: new Date()
+        };
+        this.messageHistory.push(partnerMsg);
+        this.appendMessageBubble(partnerMsg);
+
+        // ออกเสียง AI
+        speechService.speak(currentLine.text);
+
+        // เลื่อนไปยังประโยคถัดไป
+        this.currentScriptIndex++;
+
+        setTimeout(() => {
+          this.processNextScriptTurn();
+        }, 1400);
+      }, 400);
+    }
+  }
+
+  async submitUserScriptLine(text) {
+    if (!this.activeScenario || this.isSubmittingScriptLine) return;
+    this.isSubmittingScriptLine = true;
+
+    speechService.stopListening();
+    const teleprompter = document.getElementById('guided-teleprompter');
+    if (teleprompter) teleprompter.style.display = 'none';
+
+    // ใส่ Bubble ของผู้เรียน
+    const userMsg = {
+      id: 'msg_' + Date.now(),
+      sender: 'user',
+      text: text,
+      timestamp: new Date()
+    };
+    this.messageHistory.push(userMsg);
+    this.appendMessageBubble(userMsg);
+
+    // มอบ 1 ดาว
+    const newStars = await dbService.awardStar(1);
+    this.updateStatsBanner();
+    modalController.showToast(`⭐ เยี่ยมมาก! ออกเสียงประโยคสำเร็จ (+1 ดาว)`, 'success', 2000);
+
+    // เลื่อนบรรทัดสคริปต์
+    this.currentScriptIndex++;
+
+    const textInput = document.getElementById('chat-input-text');
+    if (textInput) textInput.value = '';
+
+    setTimeout(() => {
+      this.processNextScriptTurn();
+    }, 700);
+  }
+
+  async handleScriptCompleted() {
+    const teleprompter = document.getElementById('guided-teleprompter');
+    if (teleprompter) teleprompter.style.display = 'none';
+
+    const statusText = document.getElementById('speech-status-indicator');
+    if (statusText) statusText.textContent = '🎉 ผ่านด่านสำเร็จ!';
+
+    // มอบโบนัส +5 ดาว
+    const totalStars = await dbService.awardStar(5);
+    this.updateStatsBanner();
+
+    modalController.showToast(`🎉 ยอดเยี่ยมมากๆ เลย! พูดจบครบทั้งบทสนทนาแล้ว รับโบนัส +5 ดาวสะสม ⭐ (รวม ${totalStars} ดาว)`, 'success', 6000);
+
+    const durationSeconds = this.sessionStartTime ? Math.round((new Date() - this.sessionStartTime) / 1000) : 60;
+    await dbService.saveConversation({
+      scenarioId: this.activeScenario.id,
+      scenarioTitle: this.activeScenario.title,
+      scenarioTitleTh: this.activeScenario.titleTh,
+      turns: this.messageHistory.filter(m => m.sender === 'user').length,
+      durationSeconds,
+      messagesCount: this.messageHistory.length
+    });
   }
 
   appendMessageBubble(msg) {
@@ -364,7 +570,7 @@ export class UIController {
 
     row.innerHTML = `
       <div class="message-avatar">
-        ${isPartner ? this.activeScenario.partnerAvatar : '👤'}
+        ${isPartner ? (this.partnerAvatar || this.activeScenario?.partnerAvatar || '🧑‍🍳') : (this.userAvatar || '👦')}
       </div>
       <div class="message-content">
         <div class="bubble">${this.escapeHtml(msg.text)}</div>
@@ -441,18 +647,31 @@ export class UIController {
     speechService.onSpeechResult = (text, isFinal) => {
       if (textInput) textInput.value = text;
       if (isFinal) {
-        if (statusText) statusText.textContent = 'กดส่งหรือพูดต่อ';
+        if (this.currentScript) {
+          if (statusText) statusText.textContent = '✨ รับเสียงสำเร็จ กำลังตรวจสอบ...';
+          setTimeout(() => {
+            if (this.currentScript && !this.isSubmittingScriptLine && textInput && textInput.value.trim()) {
+              this.submitUserScriptLine(textInput.value.trim());
+            }
+          }, 600);
+        } else {
+          if (statusText) statusText.textContent = 'กดส่งหรือพูดต่อ';
+        }
       }
     };
 
     speechService.onSpeechEnd = () => {
       micBtn?.classList.remove('recording');
-      if (statusText) statusText.textContent = 'แตะไมค์เพื่อพูด';
+      if (statusText) {
+        statusText.textContent = this.currentScript ? 'แตะไมค์เพื่ออ่านออกเสียง 🎙️' : 'แตะไมค์เพื่อพูด';
+      }
     };
 
     speechService.onSpeechError = (err) => {
       micBtn?.classList.remove('recording');
-      if (statusText) statusText.textContent = 'แตะไมค์เพื่อพูด';
+      if (statusText) {
+        statusText.textContent = this.currentScript ? 'แตะไมค์เพื่ออ่านออกเสียง 🎙️' : 'แตะไมค์เพื่อพูด';
+      }
       if (err === 'not-allowed') {
         modalController.showToast('กรุณาอนุญาตการเข้าถึงไมโครโฟนบนเบราว์เซอร์ของคุณ', 'warning');
       }
@@ -495,6 +714,12 @@ export class UIController {
     const textInput = document.getElementById('chat-input-text');
     if (textInput) textInput.value = '';
     speechService.stopListening();
+
+    // กรณีอยู่ในโหมดบทสนทนาแบบ Script
+    if (this.currentScript) {
+      await this.submitUserScriptLine(text);
+      return;
+    }
 
     // 1. Append User Message
     const userMsg = {

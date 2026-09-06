@@ -284,6 +284,39 @@ export class ModalController {
       return false;
     }
   }
+
+  // ===================== ROLE SELECTION MODAL =====================
+
+  openRoleSelectionModal(scenario, onRoleSelected) {
+    const modal = document.getElementById('role-selection-modal');
+    if (!modal) return;
+
+    const btnCustomer = document.getElementById('btn-select-customer');
+    const btnShopkeeper = document.getElementById('btn-select-shopkeeper');
+    const closeBtn = document.getElementById('btn-close-role-modal');
+
+    const handleSelect = (role) => {
+      this.closeRoleSelectionModal();
+      if (onRoleSelected) onRoleSelected(role);
+    };
+
+    if (btnCustomer) {
+      btnCustomer.onclick = () => handleSelect('Customer');
+    }
+    if (btnShopkeeper) {
+      btnShopkeeper.onclick = () => handleSelect('Shopkeeper');
+    }
+    if (closeBtn) {
+      closeBtn.onclick = () => this.closeRoleSelectionModal();
+    }
+
+    modal.classList.add('active');
+  }
+
+  closeRoleSelectionModal() {
+    const modal = document.getElementById('role-selection-modal');
+    if (modal) modal.classList.remove('active');
+  }
 }
 
 export const modalController = new ModalController();
