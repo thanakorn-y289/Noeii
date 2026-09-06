@@ -56,6 +56,7 @@ export class UIController {
     }
 
     this.currentView = viewName;
+    document.body.classList.toggle('in-chat-view', viewName === 'chat');
 
     // Update active tab styles
     document.querySelectorAll('.nav-tab').forEach(tab => {
